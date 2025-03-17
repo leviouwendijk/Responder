@@ -292,6 +292,9 @@ struct ResponderView: View {
                     .buttonStyle(PlainButtonStyle())
 
                 }
+
+                Spacer()
+
                 // **Queue Management Buttons**
                 if showSuccessBanner {
                     VStack {
