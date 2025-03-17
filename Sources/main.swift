@@ -378,7 +378,7 @@ struct ResponderView: View {
                 try executeMailer(arguments)
                 // Prepare success alert on the main thread
                 DispatchQueue.main.async {
-                    successBannerMessage = "The confirmation email was sent successfully."
+                    successBannerMessage = "The email was sent successfully."
                     showSuccessBanner = true
 
                     clearContact()
