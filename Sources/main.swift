@@ -266,6 +266,9 @@ struct ResponderView: View {
                 VStack {
                     TextField("msg template (`sr`, `na`, `no-answer`)", text: $messageMakerTemplate)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .onSubmit {
+                        makeQuickMessage()
+                    }
 
                     HStack {
                         Button(action: makeQuickMessage) {
