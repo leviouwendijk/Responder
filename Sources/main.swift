@@ -318,6 +318,17 @@ struct ResponderView: View {
                     }
                     .animation(.easeInOut, value: showSuccessBanner)
                 } else {
+                    if isSendingEmail {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                            Text("Sending...")
+                        }
+                        .padding(.bottom, 10)
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: 0.3), value: isSendingEmail)
+                    }
+
                     HStack {
                         Button(action: sendMailerEmail) {
                             Label("Send mailer mail", systemImage: "paperplane.fill")
@@ -370,7 +381,9 @@ struct ResponderView: View {
     }
 
     private func sendMailerEmail() {
-        isSendingEmail = true
+        withAnimation {
+            isSendingEmail = true
+        }
         
         let data = MailerArguments(
             client: client,
@@ -391,7 +404,9 @@ struct ResponderView: View {
 
                     clearContact()
 
-                    isSendingEmail = false
+                    withAnimation {
+                        isSendingEmail = false
+                    }
 
                     // Auto-dismiss after 3 seconds
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
@@ -406,7 +421,9 @@ struct ResponderView: View {
                     alertTitle = "Error"
                     alertMessage = "There was an error sending the confirmation email:\n\(error.localizedDescription) \(arguments)"
                     showAlert = true
-                    isSendingEmail = false
+                    withAnimation {
+                        isSendingEmail = false
+                    }
                 }
             }
         }
