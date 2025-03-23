@@ -101,6 +101,8 @@ struct ResponderView: View {
     @State private var messageMakerTemplate = ""
     @State private var msgMessage = ""
 
+    @State private var isSendingEmail = false
+
     var body: some View {
         HStack {
             VStack {
@@ -264,7 +266,7 @@ struct ResponderView: View {
 
             VStack {
                 VStack {
-                    TextField("msg template (`sr`, `na`, `no-answer`)", text: $messageMakerTemplate)
+                    TextField("`sr`, `na`, `no-answer`", text: $messageMakerTemplate)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .onSubmit {
                         makeQuickMessage()
@@ -321,6 +323,7 @@ struct ResponderView: View {
                             Label("Send mailer mail", systemImage: "paperplane.fill")
                         }
                         .buttonStyle(.borderedProminent)
+                        .disabled(isSendingEmail)
                     }
                     .padding(.top, 10)
                 }
@@ -367,6 +370,8 @@ struct ResponderView: View {
     }
 
     private func sendMailerEmail() {
+        isSendingEmail = true
+        
         let data = MailerArguments(
             client: client,
             email: email,
@@ -386,6 +391,8 @@ struct ResponderView: View {
 
                     clearContact()
 
+                    isSendingEmail = false
+
                     // Auto-dismiss after 3 seconds
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                         withAnimation {
@@ -399,6 +406,7 @@ struct ResponderView: View {
                     alertTitle = "Error"
                     alertMessage = "There was an error sending the confirmation email:\n\(error.localizedDescription) \(arguments)"
                     showAlert = true
+                    isSendingEmail = false
                 }
             }
         }
