@@ -10,6 +10,17 @@ enum MailerCategory: String, RawRepresentable, CaseIterable {
     case affiliate // enum??
     // case onboarding // pre-training
     case service // follow
+    case resolution
+}
+
+extension MailerCategory {
+    var filesRequiringAvailability: Set<MailerFile> {
+        switch self {
+            case .lead:       return [.confirmation, .follow]
+            case .service:    return [.follow]
+            default:          return []
+        }
+    }
 }
 
 enum MailerFile: String, RawRepresentable, CaseIterable {
@@ -19,6 +30,7 @@ enum MailerFile: String, RawRepresentable, CaseIterable {
     case follow
     // case preTraining
     case onboarding
+    case review
 }
 
 enum Weekday: String, CaseIterable, Identifiable {
@@ -109,6 +121,7 @@ struct ResponderView: View {
         .affiliate: [],  // No valid files for affiliate (empty array)
         // .onboarding: [.preTraining], 
         .service: [.follow, .onboarding], 
+        .resolution: [.review],
         .none: MailerFile.allCases // All options available when no category is selected
     ]
 
@@ -158,6 +171,10 @@ struct ResponderView: View {
         return json
     }
 
+    private var needsAvailability: Bool {
+        selectedCategory.filesRequiringAvailability.contains(selectedFile)
+    }
+
     var mailerCommand: String {
         let mailerArgs = MailerArguments(
             client: client,
@@ -171,7 +188,8 @@ struct ResponderView: View {
             // areaCode: areaCode,
             // street: street,
             // number: number
-            availabilityJSON: availabilityJSON
+            availabilityJSON: availabilityJSON,
+            needsAvailability: needsAvailability
         )
         return mailerArgs.string()
     }
@@ -524,7 +542,8 @@ struct ResponderView: View {
             dog: dog,
             category: selectedCategory,
             file: selectedFile,
-            availabilityJSON: availabilityJSON
+            availabilityJSON: availabilityJSON,
+            needsAvailability: needsAvailability
         )
         let arguments = data.string(false)
         // Execute on a background thread to avoid blocking the UI
@@ -645,6 +664,7 @@ struct MailerArguments {
     // let street: String?
     // let number: String?
     let availabilityJSON: String?
+    let needsAvailability: Bool
 
     // func string(_ local: Bool,_ localLocation: String) -> String {
     func string(_ includeBinaryName: Bool = true) -> String {
@@ -655,8 +675,8 @@ struct MailerArguments {
                 "--client \"\(client)\"",
                 "--email \"\(email)\"",
                 "--dog \"\(dog)\"",
-                file == .none || file == .issue || file == .confirmation ? nil : "--\(file.rawValue)",
-                "--availability-json '\(availabilityJSON ?? "")'",
+                file == .none || file == .issue || file == .confirmation || file == .review ? nil : "--\(file.rawValue)",
+                needsAvailability ? "--availability-json '\(availabilityJSON ?? "")'": nil,
                 // "--date \"\(date)\"",
                 // "--time \"\(time)\"",
                 // "--location \"\(local ? localLocation : location)\""
@@ -681,8 +701,8 @@ struct MailerArguments {
                 "--client \"\(client)\"",
                 "--email \"\(email)\"",
                 "--dog \"\(dog)\"",
-                file == .none || file == .issue || file == .confirmation ? nil : "--\(file.rawValue)",
-                "--availability-json '\(availabilityJSON ?? "")'",
+                file == .none || file == .issue || file == .confirmation || file == .review ? nil : "--\(file.rawValue)",
+                needsAvailability ? "--availability-json '\(availabilityJSON ?? "")'": nil,
                 ""
             ]
             .compactMap { $0 } 
