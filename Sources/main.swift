@@ -8,7 +8,7 @@ enum MailerCategory: String, RawRepresentable, CaseIterable {
     case quote // issue, follow
     case lead // confirmation, follow
     case affiliate // enum??
-    case onboarding // pre-training
+    // case onboarding // pre-training
     case service // follow
 }
 
@@ -17,7 +17,73 @@ enum MailerFile: String, RawRepresentable, CaseIterable {
     case confirmation
     case issue 
     case follow
-    case preTraining
+    // case preTraining
+    case onboarding
+}
+
+enum Weekday: String, CaseIterable, Identifiable {
+    case mon, tue, wed, thu, fri, sat, sun
+    var id: String { rawValue }
+
+    var abbr: String {
+        switch self {
+        case .mon: return "Ma"
+        case .tue: return "Di"
+        case .wed: return "Wo"
+        case .thu: return "Do"
+        case .fri: return "Vr"
+        case .sat: return "Zat"
+        case .sun: return "Zo"
+        }
+    }
+}
+
+/// Holds one day’s on/off + start/end times
+struct DaySchedule {
+    var enabled: Bool
+    var start:   Date
+    var end:     Date
+
+    init(defaultsFor day: Weekday) {
+        let cal   = Calendar.current
+        let today = Date()
+        // helper to avoid repeating `second: 0`
+        func at(_ hour: Int, _ minute: Int) -> Date {
+            return cal.date(
+              bySettingHour: hour,
+              minute: minute,
+              second: 0,       // ← this was missing
+              of: today
+            )!
+        }
+
+        switch day {
+        case .mon:
+            enabled = true
+            start   = at(18, 0)
+            end     = at(21, 0)
+        case .tue:
+            enabled = true
+            start   = at(10, 0)
+            end     = at(21, 0)
+        case .wed:
+            enabled = true
+            start   = at(18, 0)
+            end     = at(21, 0)
+        case .thu:
+            enabled = true
+            start   = at(18, 0)
+            end     = at(21, 0)
+        case .fri:
+            enabled = true
+            start   = at(10, 0)
+            end     = at(21, 0)
+        case .sat, .sun:
+            enabled = true
+            start   = at(18, 0)
+            end     = at(21, 0)
+        }
+    }
 }
 
 struct ResponderView: View {
@@ -41,8 +107,8 @@ struct ResponderView: View {
         .quote: [.issue, .follow],  // No confirmation for quotes
         .lead: [.confirmation, .follow], 
         .affiliate: [],  // No valid files for affiliate (empty array)
-        .onboarding: [.preTraining], 
-        .service: [.follow], 
+        // .onboarding: [.preTraining], 
+        .service: [.follow, .onboarding], 
         .none: MailerFile.allCases // All options available when no category is selected
     ]
 
@@ -60,19 +126,52 @@ struct ResponderView: View {
         }
     }
 
+    @State private var weeklySchedule = Dictionary(
+        uniqueKeysWithValues: Weekday.allCases.map {
+            ($0, DaySchedule(defaultsFor: $0))
+        }
+    )
+
+    /// Builds a `[String:[String:String]]` from your `weeklySchedule`
+    private var availabilityDict: [String:[String:String]] {
+        var out = [String:[String:String]]()
+        let df: DateFormatter = {
+            let f = DateFormatter(); f.dateFormat = "HH:mm"; return f
+        }()
+        for day in Weekday.allCases {
+            if let sched = weeklySchedule[day], sched.enabled {
+                out[day.rawValue] = [
+                    "start": df.string(from: sched.start),
+                    "end":   df.string(from: sched.end)
+                ]
+            }
+        }
+        return out
+    }
+
+    /// Serializes that to a compact JSON string (or `nil` if empty)
+    private var availabilityJSON: String? {
+        guard !availabilityDict.isEmpty,
+              let data = try? JSONSerialization.data(withJSONObject: availabilityDict),
+              let json = String(data: data, encoding: .utf8)
+        else { return nil }
+        return json
+    }
+
     var mailerCommand: String {
         let mailerArgs = MailerArguments(
             client: client,
             email: email,
             dog: dog,
             category: selectedCategory,
-            file: selectedFile
+            file: selectedFile,
             // date: cliDate,
             // time: cliTime,
             // location: location,
             // areaCode: areaCode,
             // street: street,
             // number: number
+            availabilityJSON: availabilityJSON
         )
         return mailerArgs.string()
     }
@@ -300,6 +399,40 @@ struct ResponderView: View {
 
                 Spacer()
 
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Week-/time availability").bold()
+
+                    // grid two-column: day + controls
+                    ForEach(Weekday.allCases) { day in
+                      HStack(spacing: 12) {
+                        Toggle(day.abbr, isOn: Binding(
+                          get: { weeklySchedule[day]!.enabled },
+                          set: { weeklySchedule[day]!.enabled = $0 }
+                        ))
+                        .toggleStyle(.switch)
+
+                        if weeklySchedule[day]!.enabled {
+                          DatePicker("", selection: Binding(
+                            get: { weeklySchedule[day]!.start },
+                            set: { weeklySchedule[day]!.start = $0 }
+                          ), displayedComponents: .hourAndMinute)
+                          .labelsHidden()
+                          .datePickerStyle(.compact)
+
+                          DatePicker("", selection: Binding(
+                            get: { weeklySchedule[day]!.end },
+                            set: { weeklySchedule[day]!.end = $0 }
+                          ), displayedComponents: .hourAndMinute)
+                          .labelsHidden()
+                          .datePickerStyle(.compact)
+                        }
+                      }
+                    }
+                }
+                .padding(.vertical, 8)
+
+                Spacer()
+
                 // **Queue Management Buttons**
                 if showSuccessBanner {
                     VStack {
@@ -390,7 +523,8 @@ struct ResponderView: View {
             email: email,
             dog: dog,
             category: selectedCategory,
-            file: selectedFile
+            file: selectedFile,
+            availabilityJSON: availabilityJSON
         )
         let arguments = data.string(false)
         // Execute on a background thread to avoid blocking the UI
@@ -510,6 +644,7 @@ struct MailerArguments {
     // let areaCode: String?
     // let street: String?
     // let number: String?
+    let availabilityJSON: String?
 
     // func string(_ local: Bool,_ localLocation: String) -> String {
     func string(_ includeBinaryName: Bool = true) -> String {
@@ -521,6 +656,7 @@ struct MailerArguments {
                 "--email \"\(email)\"",
                 "--dog \"\(dog)\"",
                 file == .none || file == .issue || file == .confirmation ? nil : "--\(file.rawValue)",
+                "--availability-json '\(availabilityJSON ?? "")'",
                 // "--date \"\(date)\"",
                 // "--time \"\(time)\"",
                 // "--location \"\(local ? localLocation : location)\""
@@ -546,6 +682,7 @@ struct MailerArguments {
                 "--email \"\(email)\"",
                 "--dog \"\(dog)\"",
                 file == .none || file == .issue || file == .confirmation ? nil : "--\(file.rawValue)",
+                "--availability-json '\(availabilityJSON ?? "")'",
                 ""
             ]
             .compactMap { $0 } 
