@@ -16,7 +16,7 @@ enum MailerCategory: String, RawRepresentable, CaseIterable {
 extension MailerCategory {
     var filesRequiringAvailability: Set<MailerFile> {
         switch self {
-            case .lead:       return [.confirmation, .follow]
+            case .lead:       return [.confirmation, .check, .follow]
             case .service:    return [.follow]
             default:          return []
         }
@@ -31,6 +31,7 @@ enum MailerFile: String, RawRepresentable, CaseIterable {
     // case preTraining
     case onboarding
     case review
+    case check
 }
 
 enum Weekday: String, CaseIterable, Identifiable {
@@ -117,7 +118,7 @@ struct ResponderView: View {
 
     private let validFilesForCategory: [MailerCategory: [MailerFile]] = [
         .quote: [.issue, .follow],  // No confirmation for quotes
-        .lead: [.confirmation, .follow], 
+        .lead: [.confirmation, .check, .follow], 
         .affiliate: [],  // No valid files for affiliate (empty array)
         // .onboarding: [.preTraining], 
         .service: [.follow, .onboarding], 
