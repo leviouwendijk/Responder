@@ -32,6 +32,7 @@ enum MailerFile: String, RawRepresentable, CaseIterable {
     case onboarding
     case review
     case check
+    case food
 }
 
 enum Weekday: String, CaseIterable, Identifiable {
@@ -40,13 +41,13 @@ enum Weekday: String, CaseIterable, Identifiable {
 
     var abbr: String {
         switch self {
-        case .mon: return "Ma"
-        case .tue: return "Di"
-        case .wed: return "Wo"
-        case .thu: return "Do"
-        case .fri: return "Vr"
-        case .sat: return "Zat"
-        case .sun: return "Zo"
+            case .mon: return "Ma"
+            case .tue: return "Di"
+            case .wed: return "Wo"
+            case .thu: return "Do"
+            case .fri: return "Vr"
+            case .sat: return "Zat"
+            case .sun: return "Zo"
         }
     }
 }
@@ -119,7 +120,7 @@ struct ResponderView: View {
     private let validFilesForCategory: [MailerCategory: [MailerFile]] = [
         .quote: [.issue, .follow],  // No confirmation for quotes
         .lead: [.confirmation, .check, .follow], 
-        .affiliate: [],  // No valid files for affiliate (empty array)
+        .affiliate: [.food],  // No valid files for affiliate (empty array)
         // .onboarding: [.preTraining], 
         .service: [.follow, .onboarding], 
         .resolution: [.review],
