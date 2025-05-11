@@ -10,4 +10,5 @@ DerivedData/
 .index-build/
 
 Responder.app/Contents/MacOS/Responder
+Responder.app/
 Package.resolved
