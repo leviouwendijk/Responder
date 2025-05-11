@@ -8,3 +8,5 @@ DerivedData/
 .netrc
 
 .index-build/
+
+Responder.app/Contents/MacOS/Responder
