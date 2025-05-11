@@ -222,6 +222,8 @@ struct ResponderView: View {
 
     @State private var isSendingEmail = false
 
+    @State private var mailerOutput = ""
+
     var body: some View {
         HStack {
             VStack {
@@ -493,6 +495,27 @@ struct ResponderView: View {
                 }
             }
             .frame(width: 400)
+            
+            // new stdout pane:
+            Divider()
+
+            VStack(alignment: .leading) {
+                Text("Mailer Log").bold()
+                    ScrollView {
+                        Text(mailerOutput)
+                            .font(.system(.body, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(4)
+                    }
+                .background(Color.black.opacity(0.05))
+                .cornerRadius(6)
+                // .frame(height: 500)
+
+            }
+            .frame(minWidth: 50)
+            // end of new stdout pane
+
+            // .frame(width: 400)
         }
         .padding()
         .onAppear {
@@ -533,11 +556,17 @@ struct ResponderView: View {
         }
     }
 
+    // change this according to view params (Responder / Picker diffs)
+    private func cleanThisView() {
+        // clearQueue() // unique to Responder
+        clearContact()
+    }
+
     private func sendMailerEmail() {
-        withAnimation {
-            isSendingEmail = true
-        }
-        
+        mailerOutput = ""
+
+        withAnimation { isSendingEmail = true }
+
         let data = MailerArguments(
             client: client,
             email: email,
@@ -548,41 +577,110 @@ struct ResponderView: View {
             needsAvailability: needsAvailability
         )
         let arguments = data.string(false)
-        // Execute on a background thread to avoid blocking the UI
+
         DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                try executeMailer(arguments)
-                // Prepare success alert on the main thread
-                DispatchQueue.main.async {
-                    successBannerMessage = "The email was sent successfully."
-                    showSuccessBanner = true
+            let home = Home.string()
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/bin/zsh")
+            proc.arguments = ["-c", "source ~/dotfiles/.vars.zsh && \(home)/sbm-bin/mailer \(arguments)"]
 
-                    clearContact()
+            let outPipe = Pipe(), errPipe = Pipe()
+            proc.standardOutput = outPipe
+            proc.standardError  = errPipe
 
-                    withAnimation {
-                        isSendingEmail = false
-                    }
-
-                    // Auto-dismiss after 3 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                        withAnimation {
-                            showSuccessBanner = false
-                        }
+            // whenever stdout or stderr arrives, append it to mailerOutput
+            func install(_ handle: FileHandle) {
+                handle.readabilityHandler = { h in
+                    let data = h.availableData
+                    guard !data.isEmpty, let str = String(data: data, encoding: .utf8) else { return }
+                    DispatchQueue.main.async {
+                        mailerOutput += str
                     }
                 }
+            }
+            install(outPipe.fileHandleForReading)
+            install(errPipe.fileHandleForReading)
+
+            do {
+                try proc.run()
             } catch {
-                // Prepare failure alert on the main thread
                 DispatchQueue.main.async {
-                    alertTitle = "Error"
-                    alertMessage = "There was an error sending the confirmation email:\n\(error.localizedDescription) \(arguments)"
-                    showAlert = true
-                    withAnimation {
-                        isSendingEmail = false
-                    }
+                    mailerOutput += "launch failed: \(error.localizedDescription)\n"
+                }
+            }
+
+            proc.waitUntilExit()
+
+            DispatchQueue.main.async {
+                // stop spinner
+                withAnimation { isSendingEmail = false }
+
+                // banner
+                successBannerMessage = proc.terminationStatus == 0
+                  ? "mailer completed successfully."
+                  : "mailer exited with code \(proc.terminationStatus)."
+                showSuccessBanner = true
+
+                cleanThisView()
+
+                // auto‐dismiss banner
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    withAnimation { showSuccessBanner = false }
                 }
             }
         }
     }
+
+    // private func sendMailerEmail() {
+    //     withAnimation {
+    //         isSendingEmail = true
+    //     }
+        
+    //     let data = MailerArguments(
+    //         client: client,
+    //         email: email,
+    //         dog: dog,
+    //         category: selectedCategory,
+    //         file: selectedFile,
+    //         availabilityJSON: availabilityJSON,
+    //         needsAvailability: needsAvailability
+    //     )
+    //     let arguments = data.string(false)
+    //     // Execute on a background thread to avoid blocking the UI
+    //     DispatchQueue.global(qos: .userInitiated).async {
+    //         do {
+    //             try executeMailer(arguments)
+    //             // Prepare success alert on the main thread
+    //             DispatchQueue.main.async {
+    //                 successBannerMessage = "mailer process was executed successfully."
+    //                 showSuccessBanner = true
+
+    //                 clearContact()
+
+    //                 withAnimation {
+    //                     isSendingEmail = false
+    //                 }
+
+    //                 // Auto-dismiss after 3 seconds
+    //                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+    //                     withAnimation {
+    //                         showSuccessBanner = false
+    //                     }
+    //                 }
+    //             }
+    //         } catch {
+    //             // Prepare failure alert on the main thread
+    //             DispatchQueue.main.async {
+    //                 alertTitle = "Error"
+    //                 alertMessage = "There was an error in executing the mailer process:\n\(error.localizedDescription) \(arguments)"
+    //                 showAlert = true
+    //                 withAnimation {
+    //                     isSendingEmail = false
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     private func clearContact() {
         client = ""
