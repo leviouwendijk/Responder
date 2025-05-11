@@ -100,6 +100,23 @@ struct DaySchedule {
     }
 }
 
+extension String {
+    /// Returns the first capture‐group for `pattern`, or nil.
+    func firstCapturedGroup(
+      pattern: String,
+      options: NSRegularExpression.Options = []
+    ) -> String? {
+      guard let re = try? NSRegularExpression(pattern: pattern, options: options)
+      else { return nil }
+      let ns = self as NSString
+      let full = NSRange(location: 0, length: ns.length)
+      guard let m = re.firstMatch(in: self, options: [], range: full),
+            m.numberOfRanges >= 2
+      else { return nil }
+      return ns.substring(with: m.range(at: 1))
+    }
+}
+
 struct ResponderView: View {
     @State private var client = ""
     @State private var email = ""
@@ -223,6 +240,9 @@ struct ResponderView: View {
     @State private var isSendingEmail = false
 
     @State private var mailerOutput = ""
+
+    @State private var bannerColor: Color = .gray
+    @State private var httpStatus: Int?
 
     var body: some View {
         HStack {
@@ -460,13 +480,15 @@ struct ResponderView: View {
                     VStack {
                         Spacer()
                         HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.white)
+                            Image(systemName: bannerColor == .green
+                                    ? "checkmark.circle.fill"
+                                    : "xmark.octagon.fill")
+                            .foregroundColor(.white)
                             Text(successBannerMessage)
-                                .foregroundColor(.white)
+                            .foregroundColor(.white)
                         }
                         .padding()
-                        .background(Color.green)
+                        .background(bannerColor)
                         .cornerRadius(8)
                         .padding(.bottom, 20)
                         .transition(.move(edge: .bottom))
@@ -631,6 +653,34 @@ struct ResponderView: View {
                   ? "mailer completed successfully."
                   : "mailer exited with code \(proc.terminationStatus)."
                 showSuccessBanner = true
+
+                // color mechanism:
+                // 1) try grab the HTTP status line
+                if let codeStr = mailerOutput.firstCapturedGroup(
+                     pattern: #"HTTP Status Code:\s*(\d{3})"#,
+                     options: .caseInsensitive
+                   ),
+                   let code = Int(codeStr)
+                {
+                  httpStatus  = code
+                  bannerColor = (200..<300).contains(code) ? .green : .red
+                }
+                // 2) grab the *last* {...} JSON
+                if let jsonRange = mailerOutput.range(
+                     of: #"\{[\s\S]*\}"#,
+                     options: [.regularExpression, .backwards]
+                   )
+                {
+                  let blob = String(mailerOutput[jsonRange])
+                  if let d    = blob.data(using: .utf8),
+                     let resp = try? JSONDecoder().decode(APIError.self, from: d)
+                  {
+                    // override color/message based on server response
+                    bannerColor        = resp.success ? .green : .red
+                    successBannerMessage = resp.message
+                  }
+                }
+                // end of color mechanism
 
                 cleanThisView()
 
