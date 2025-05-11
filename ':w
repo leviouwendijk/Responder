@@ -120,14 +120,6 @@ extension String {
     }
 }
 
-extension String {
-    func htmlClean() -> String {
-        return self
-            .replacingOccurrences(of: "\n", with: "")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-    }
-}
-
 struct TemplateFetchResponse: Decodable {
     let success: Bool
     let html: String
@@ -215,20 +207,12 @@ struct ResponderView: View {
         return (selectedCategory == .custom)
     }
 
-    var finalSubject: String {
-        return replaceTemplateVariables(subject)
-    }
-
-    var finalHtml: String {
-        return replaceTemplateVariables(fetchedHtml.htmlClean())
-    }
-
     var mailerCommand: String {
         if isCustomCategorySelected {
             if selectedFile == .template {
                 return "mailer template-api \(fetchableCategory) \(fetchableFile)"
             } else {
-                return "mailer custom-message --client \"\(client)\" --dog \"\(dog)\" --email \"\(email)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
+                return "mailer custom-message --client \(client) --dog \(dog) --email \(email) --subject \(subject) --body \(fetchedHtml.replacingOccurrences(of: "\n", with: "")"
             }
         } else {
             let mailerArgs = MailerArguments(
@@ -334,72 +318,57 @@ struct ResponderView: View {
 
             // Output and format control
             VStack {
-                if !(isCustomCategorySelected && selectedFile == .template) {
-                    HStack {
-                        Spacer()
-                        Button("Load Contacts") {
-                            requestContactsAccess()
-                        }
-                        .padding()
-                        Spacer()
-                        Toggle("Local Location", isOn: $local)
-                        .padding()
+                HStack {
+                    Spacer()
+                    Button("Load Contacts") {
+                        requestContactsAccess()
                     }
+                    .padding()
+                    Spacer()
+                    Toggle("Local Location", isOn: $local)
+                    .padding()
                 }
 
                 VStack(alignment: .leading) {
-                    if !(isCustomCategorySelected && selectedFile == .template) {
-                        // Contact Search Bar
-                        TextField("Search Contacts", text: $searchQuery)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .padding(.horizontal)
+                    // Contact Search Bar
+                    TextField("Search Contacts", text: $searchQuery)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .padding(.horizontal)
 
-                        // Contact List
-                        List(filteredContacts, id: \.identifier) { contact in
-                            Button(action: {
-                                clearContact()
+                    // Contact List
+                    List(filteredContacts, id: \.identifier) { contact in
+                        Button(action: {
+                            clearContact()
 
-                                selectedContact = contact
+                            selectedContact = contact
 
-                                let split = splitClientDog(contact.givenName)
-                                client = split.name
-                                dog = split.dog
-                                email = contact.emailAddresses.first?.value as String? ?? ""
-                                
-                                if let postalAddress = contact.postalAddresses.first?.value {
-                                    location = postalAddress.city
-                                    street = postalAddress.street
-                                    areaCode = postalAddress.postalCode
-                                }
-                            }) {
-                                HStack {
-                                    Text("\(contact.givenName) \(contact.familyName)")
-                                        .font(selectedContact?.identifier == contact.identifier ? .headline : .body)
-                                    Spacer()
-                                    Text(contact.emailAddresses.first?.value as String? ?? "")
-                                        .foregroundColor(.gray)
-                                }
+                            let split = splitClientDog(contact.givenName)
+                            client = split.name
+                            dog = split.dog
+                            email = contact.emailAddresses.first?.value as String? ?? ""
+                            
+                            if let postalAddress = contact.postalAddresses.first?.value {
+                                location = postalAddress.city
+                                street = postalAddress.street
+                                areaCode = postalAddress.postalCode
+                            }
+                        }) {
+                            HStack {
+                                Text("\(contact.givenName) \(contact.familyName)")
+                                    .font(selectedContact?.identifier == contact.identifier ? .headline : .body)
+                                Spacer()
+                                Text(contact.emailAddresses.first?.value as String? ?? "")
+                                    .foregroundColor(.gray)
                             }
                         }
-                        .scrollContentBackground(.hidden) 
-                        .frame(height: 200)
-                        .padding()
                     }
+                    .scrollContentBackground(.hidden) 
+                    .frame(height: 200)
 
                     Text("Mailer Arguments").bold()
                     
 
-                    if isCustomCategorySelected && selectedFile == .template {
-                        HStack {
-                            TextField("Category", text: $fetchableCategory)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-
-                            Text("/")
-
-                            TextField("File", text: $fetchableFile)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                        }
-                    } else {
+                    if !isCustomCategorySelected {
                         TextField("Client", text: $client)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                         
@@ -432,6 +401,16 @@ struct ResponderView: View {
                             set: { number = local ? nil : ($0.isEmpty ? nil : $0) }
                         ))
                         .textFieldStyle(RoundedBorderTextFieldStyle())
+                    } else {
+                        HStack {
+                            TextField("Category", text: $fetchableCategory)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+
+                            Text("/")
+
+                            TextField("File", text: $fetchableFile)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                        }
                     }
                 }
                 .padding()
@@ -634,13 +613,6 @@ struct ResponderView: View {
         }
     }
 
-    func replaceTemplateVariables(_ string: String) -> String {
-        return string
-            .replacingOccurrences(of: "{{name}}", with: client)
-            .replacingOccurrences(of: "{{dog}}", with: dog)
-            .replacingOccurrences(of: "{{email}}", with: email)
-    }
-
     private func requestContactsAccess() {
         let store = CNContactStore()
         store.requestAccess(for: .contacts) { granted, error in
@@ -687,7 +659,7 @@ struct ResponderView: View {
             if selectedFile == .template {
                 arguments = "template-api \(fetchableCategory) \(fetchableFile)"
             } else {
-                arguments = "custom-message --client \"\(client)\" --dog \"\(dog)\" --email \"\(email)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
+                arguments = "custom-message --client \(client) --dog \(dog) --email \(email) --subject \(subject) --body \(fetchedHtml)"
             }
         } else {
             let data = MailerArguments(
@@ -770,10 +742,6 @@ struct ResponderView: View {
                     // override color/message based on server response
                     bannerColor        = resp.success ? .green : .red
                     successBannerMessage = resp.message
-
-                    if resp.success {
-                        cleanThisView()
-                    }
                   }
                 }
                 // end of color mechanism
@@ -795,7 +763,7 @@ struct ResponderView: View {
                     }
                 }
 
-                // cleanThisView()
+                cleanThisView()
 
                 // auto‐dismiss banner
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
