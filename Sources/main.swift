@@ -447,7 +447,7 @@ struct ResponderView: View {
                         TextField("Client (variable: \"{{name}}\"", text: $client)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                         
-                        TextField("Email", text: $email)
+                        TextField("Email (accepts comma-separated values)", text: $email)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                         
                         TextField("Dog (variable: \"{{dog}}\"", text: $dog)
