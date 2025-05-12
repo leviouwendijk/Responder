@@ -701,6 +701,7 @@ struct ResponderView: View {
     func replaceTemplateVariables(_ string: String) -> String {
         return string
             .replacingOccurrences(of: "{{name}}", with: (client.isEmpty ? "{{name}}" : client))
+            .replacingOccurrences(of: "{{client}}", with: (client.isEmpty ? "{{client}}" : client))
             .replacingOccurrences(of: "{{dog}}", with: (dog.isEmpty ? "{{dog}}" : dog))
             // .replacingOccurrences(of: "{{email}}", with: email)
     }
