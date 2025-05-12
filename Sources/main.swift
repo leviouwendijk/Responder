@@ -251,7 +251,7 @@ struct ResponderView: View {
     }
 
     var finalHtmlContainsRawVariables: Bool {
-        let pattern = #"\{\{[A-Za-z]+\}\}"#
+        let pattern = #"\{\{.*?\}\}"#
         return finalHtml.range(of: pattern, options: .regularExpression) != nil
     }
 
