@@ -250,8 +250,8 @@ struct ResponderView: View {
         return replaceTemplateVariables(fetchedHtml.htmlClean())
     }
 
-    var finalHtmlContainsRawVariables: Bool {
-        let pattern = #"\{\{.*?\}\}"#
+    private var finalHtmlContainsRawVariables: Bool {
+        let pattern = #"\{\{\s*(?!IMAGE_WIDTH\b)[^}]+\s*\}\}"#
         return finalHtml.range(of: pattern, options: .regularExpression) != nil
     }
 
