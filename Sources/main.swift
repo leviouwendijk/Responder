@@ -255,6 +255,36 @@ struct ResponderView: View {
         return finalHtml.range(of: pattern, options: .regularExpression) != nil
     }
 
+    private var contactExtractionError: Bool {
+        return (client == "ERR" || dog == "ERR")
+    }
+
+    private var emptySubjectWarning: Bool {
+        return subject.isEmpty
+    }
+
+    private var emptyEmailWarning: Bool {
+        return email.isEmpty
+    }
+
+    private var anyInvalidConditionsCheck: Bool {
+        // if custom/template, be more tolerant about starting mailer
+        if (isCustomCategorySelected && selectedFile == .template) {
+            return false
+        // if custom/.., check the html body for raw variables
+        } else if (isCustomCategorySelected) {
+            return (finalHtmlContainsRawVariables || contactExtractionError || emptySubjectWarning || emptyEmailWarning)
+        // otherwise, check for parsing errs in client / dog names in primary templates
+        } else {
+            if contactExtractionError {
+                return true
+            // if all that clears, do not raise invalid marker
+            } else {
+                return false
+            }
+        }
+    }
+
     var mailerCommand: String {
         if isCustomCategorySelected {
             if selectedFile == .template {
@@ -432,7 +462,6 @@ struct ResponderView: View {
 
                     Text("Mailer Arguments").bold()
                     
-
                     if isCustomCategorySelected && selectedFile == .template {
                         HStack {
                             TextField("Category", text: $fetchableCategory)
@@ -476,6 +505,12 @@ struct ResponderView: View {
                             set: { number = local ? nil : ($0.isEmpty ? nil : $0) }
                         ))
                         .textFieldStyle(RoundedBorderTextFieldStyle())
+
+                        Button("clear contact") {
+                            clearContact()
+                        }
+                        .padding()
+
                     }
                 }
                 .padding()
@@ -556,6 +591,11 @@ struct ResponderView: View {
                         .font(.system(.body, design: .monospaced))
                         .border(Color.gray)
                         .frame(minHeight: 300)
+
+                        Button("clear html") {
+                            fetchedHtml = ""
+                        }
+                        .padding()
                     }
                     .padding()
                 } else {
@@ -625,13 +665,73 @@ struct ResponderView: View {
                         .animation(.easeInOut(duration: 0.3), value: isSendingEmail)
                     }
 
-                    if finalHtmlContainsRawVariables {
+                    if (anyInvalidConditionsCheck && emptySubjectWarning) {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .font(.headline)
                                 .accessibilityHidden(true)
 
-                            Text("Please replace all template variables before sending.")
+                            Text("emptySubjectWarning: fill out a subject")
+                            .font(.subheadline)
+                            .bold()
+                        }
+                        .foregroundColor(.black)
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 16)
+                        .background(Color.yellow)
+                        .cornerRadius(8)
+                        .padding(.horizontal)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .animation(.easeInOut, value: (anyInvalidConditionsCheck && emptySubjectWarning))
+                    }
+
+                    if (anyInvalidConditionsCheck && emptyEmailWarning) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.headline)
+                                .accessibilityHidden(true)
+
+                            Text("emptyEmailWarning: fill out a subject")
+                            .font(.subheadline)
+                            .bold()
+                        }
+                        .foregroundColor(.black)
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 16)
+                        .background(Color.yellow)
+                        .cornerRadius(8)
+                        .padding(.horizontal)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .animation(.easeInOut, value: (anyInvalidConditionsCheck && emptyEmailWarning))
+                    }
+
+                    if (anyInvalidConditionsCheck && contactExtractionError) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.headline)
+                                .accessibilityHidden(true)
+
+                            Text("ContactExtractionError: client or dog name is invalid")
+                            .font(.subheadline)
+                            .bold()
+                        }
+                        .foregroundColor(.white)
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 16)
+                        .background(Color.red)
+                        .cornerRadius(8)
+                        .padding(.horizontal)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .animation(.easeInOut, value: (anyInvalidConditionsCheck && contactExtractionError))
+                    }
+
+                    if (anyInvalidConditionsCheck && finalHtmlContainsRawVariables) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.headline)
+                                .accessibilityHidden(true)
+
+                            Text("Please replace all raw template variables before sending.")
                                 .font(.subheadline)
                                 .bold()
                         }
@@ -642,7 +742,7 @@ struct ResponderView: View {
                         .cornerRadius(8)
                         .padding(.horizontal)
                         .transition(.move(edge: .top).combined(with: .opacity))
-                        .animation(.easeInOut, value: finalHtmlContainsRawVariables)
+                        .animation(.easeInOut, value: (anyInvalidConditionsCheck && finalHtmlContainsRawVariables))
                     }
 
                     HStack {
@@ -650,7 +750,7 @@ struct ResponderView: View {
                             Label("Start mailer process", systemImage: "paperplane.fill")
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(isSendingEmail || finalHtmlContainsRawVariables)
+                        .disabled(isSendingEmail || anyInvalidConditionsCheck)
                     }
                     .padding(.top, 10)
                 }
