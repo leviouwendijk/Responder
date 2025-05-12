@@ -691,7 +691,7 @@ struct ResponderView: View {
                                 .font(.headline)
                                 .accessibilityHidden(true)
 
-                            Text("emptyEmailWarning: fill out a subject")
+                            Text("emptyEmailWarning: fill out an email or multiple")
                             .font(.subheadline)
                             .bold()
                         }
