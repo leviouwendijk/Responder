@@ -3,6 +3,20 @@ import Contacts
 import EventKit
 import plate
 
+let htmlDoc = """
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+    </head>
+    <body>
+
+    ...
+
+    </body>
+</html>
+"""
+
 enum MailerCategory: String, RawRepresentable, CaseIterable {
     case none
     case quote // issue, follow
@@ -136,6 +150,19 @@ struct TemplateFetchResponse: Decodable {
 struct ResponderView: View {
     @State private var client = ""
     @State private var email = ""
+
+    var finalEmail: String {
+        email
+        // 1. Split on commas
+        .split(separator: ",")
+        // 2. Trim whitespace/newlines around each piece
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        // 3. Drop any empty strings (in case of trailing commas or double-commas)
+        .filter { !$0.isEmpty }
+        // 4. Join back together with a single space
+        .joined(separator: " ")
+    }
+
     @State private var dog = ""
     @State private var location = ""
     @State private var areaCode: String?
@@ -223,17 +250,22 @@ struct ResponderView: View {
         return replaceTemplateVariables(fetchedHtml.htmlClean())
     }
 
+    var finalHtmlContainsRawVariables: Bool {
+        let pattern = #"\{\{[A-Za-z]+\}\}"#
+        return finalHtml.range(of: pattern, options: .regularExpression) != nil
+    }
+
     var mailerCommand: String {
         if isCustomCategorySelected {
             if selectedFile == .template {
                 return "mailer template-api \(fetchableCategory) \(fetchableFile)"
             } else {
-                return "mailer custom-message --client \"\(client)\" --dog \"\(dog)\" --email \"\(email)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
+                return "mailer custom-message --email \"\(finalEmail)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
             }
         } else {
             let mailerArgs = MailerArguments(
                 client: client,
-                email: email,
+                email: finalEmail,
                 dog: dog,
                 category: selectedCategory,
                 file: selectedFile,
@@ -340,8 +372,20 @@ struct ResponderView: View {
                         Button("Load Contacts") {
                             requestContactsAccess()
                         }
-                        .padding()
+
                         Spacer()
+
+                        Button("Memo") {
+                            email = "casper@hondenmeesters.nl, shusha@hondenmeesters.nl, levi@hondenmeesters.nl"
+
+                            if fetchedHtml.isEmpty {
+                                fetchedHtml = htmlDoc
+                            }
+                        }
+                        .padding()
+
+                        Spacer()
+
                         Toggle("Local Location", isOn: $local)
                         .padding()
                     }
@@ -400,13 +444,13 @@ struct ResponderView: View {
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                         }
                     } else {
-                        TextField("Client", text: $client)
+                        TextField("Client (variable: \"{{name}}\"", text: $client)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                         
                         TextField("Email", text: $email)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                         
-                        TextField("Dog", text: $dog)
+                        TextField("Dog (variable: \"{{dog}}\"", text: $dog)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
 
                         TextField("Location", text: Binding(
@@ -581,12 +625,32 @@ struct ResponderView: View {
                         .animation(.easeInOut(duration: 0.3), value: isSendingEmail)
                     }
 
+                    if finalHtmlContainsRawVariables {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.headline)
+                                .accessibilityHidden(true)
+
+                            Text("Please replace all template variables before sending.")
+                                .font(.subheadline)
+                                .bold()
+                        }
+                        .foregroundColor(.white)
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 16)
+                        .background(Color.red)
+                        .cornerRadius(8)
+                        .padding(.horizontal)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .animation(.easeInOut, value: finalHtmlContainsRawVariables)
+                    }
+
                     HStack {
                         Button(action: sendMailerEmail) {
                             Label("Start mailer process", systemImage: "paperplane.fill")
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(isSendingEmail)
+                        .disabled(isSendingEmail || finalHtmlContainsRawVariables)
                     }
                     .padding(.top, 10)
                 }
@@ -636,9 +700,9 @@ struct ResponderView: View {
 
     func replaceTemplateVariables(_ string: String) -> String {
         return string
-            .replacingOccurrences(of: "{{name}}", with: client)
-            .replacingOccurrences(of: "{{dog}}", with: dog)
-            .replacingOccurrences(of: "{{email}}", with: email)
+            .replacingOccurrences(of: "{{name}}", with: (client.isEmpty ? "{{name}}" : client))
+            .replacingOccurrences(of: "{{dog}}", with: (dog.isEmpty ? "{{dog}}" : dog))
+            // .replacingOccurrences(of: "{{email}}", with: email)
     }
 
     private func requestContactsAccess() {
@@ -687,12 +751,12 @@ struct ResponderView: View {
             if selectedFile == .template {
                 arguments = "template-api \(fetchableCategory) \(fetchableFile)"
             } else {
-                arguments = "custom-message --client \"\(client)\" --dog \"\(dog)\" --email \"\(email)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
+                arguments = "custom-message --email \"\(finalEmail)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
             }
         } else {
             let data = MailerArguments(
                 client: client,
-                email: email,
+                email: finalEmail,
                 dog: dog,
                 category: selectedCategory,
                 file: selectedFile,
