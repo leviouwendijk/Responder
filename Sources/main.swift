@@ -856,6 +856,9 @@ struct ResponderView: View {
     private func cleanThisView() {
         // clearQueue() // unique to Responder
         clearContact()
+        if includeQuoteInCustomMessage {
+            includeQuoteInCustomMessage = false
+        }
     }
     
     private func copyMailerOutput() {
