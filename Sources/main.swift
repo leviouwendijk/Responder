@@ -290,7 +290,14 @@ struct ResponderView: View {
             if selectedFile == .template {
                 return "mailer template-api \(fetchableCategory) \(fetchableFile)"
             } else {
-                return "mailer custom-message --email \"\(finalEmail)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
+                var argumentString = ""
+                argumentString = "mailer custom-message --email \"\(finalEmail)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
+                
+                if includeQuoteInCustomMessage {
+                    argumentString.append(" --quote")
+                }
+
+                return argumentString
             }
         } else {
             let mailerArgs = MailerArguments(
@@ -349,6 +356,8 @@ struct ResponderView: View {
     @State private var fetchedHtml: String = ""
     @State private var subject: String = ""
 
+    @State private var includeQuoteInCustomMessage = false
+
     var body: some View {
         HStack {
             VStack {
@@ -396,30 +405,23 @@ struct ResponderView: View {
 
             // Output and format control
             VStack {
-                if !(isCustomCategorySelected && selectedFile == .template) {
-                    HStack {
-                        Spacer()
-                        Button("Load Contacts") {
-                            requestContactsAccess()
-                        }
 
-                        Spacer()
-
-                        Button("Memo") {
-                            email = "casper@hondenmeesters.nl, shusha@hondenmeesters.nl, levi@hondenmeesters.nl"
-
-                            if fetchedHtml.isEmpty {
-                                fetchedHtml = htmlDoc
+                VStack {
+                    if !(isCustomCategorySelected && selectedFile == .template) {
+                        HStack {
+                            Button("Load Contacts") {
+                                requestContactsAccess()
                             }
+
+                            Spacer()
+
+                            Toggle("Local Location", isOn: $local)
+                            // .padding()
                         }
-                        .padding()
 
-                        Spacer()
-
-                        Toggle("Local Location", isOn: $local)
-                        .padding()
                     }
                 }
+                .frame(maxWidth: 350)
 
                 VStack(alignment: .leading) {
                     if !(isCustomCategorySelected && selectedFile == .template) {
@@ -506,10 +508,28 @@ struct ResponderView: View {
                         ))
                         .textFieldStyle(RoundedBorderTextFieldStyle())
 
-                        Button("clear contact") {
-                            clearContact()
+                        HStack {
+                            Button("Clear contact") {
+                                clearContact()
+                            }
+
+                            Spacer()
+
+                            if selectedFile == .message {
+                                Button("Memo") {
+                                    email = "casper@hondenmeesters.nl, shusha@hondenmeesters.nl, levi@hondenmeesters.nl"
+
+                                    if fetchedHtml.isEmpty {
+                                        fetchedHtml = htmlDoc
+                                    }
+                                }
+                                // .padding()
+
+                                Toggle("Include quote", isOn: $includeQuoteInCustomMessage)
+                                // .padding()
+                            }
                         }
-                        .padding()
+                        .frame(maxWidth: 350)
 
                     }
                 }
@@ -852,7 +872,15 @@ struct ResponderView: View {
             if selectedFile == .template {
                 arguments = "template-api \(fetchableCategory) \(fetchableFile)"
             } else {
-                arguments = "custom-message --email \"\(finalEmail)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
+                var argumentString = ""
+                argumentString = "custom-message --email \"\(finalEmail)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
+                
+                if includeQuoteInCustomMessage {
+                    argumentString.append(" --quote")
+                }
+
+                arguments = argumentString
+                // arguments = "custom-message --email \"\(finalEmail)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
             }
         } else {
             let data = MailerArguments(
