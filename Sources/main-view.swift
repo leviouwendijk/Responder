@@ -370,74 +370,86 @@ struct ResponderView: View {
     var body: some View {
         HStack {
             VStack {
-                // Text("Category").bold()
-                SectionTitle(title: "Category", width: 150)
+                HStack {
+                    VStack {
+                        // Text("Category").bold()
+                        SectionTitle(title: "Category", width: 150)
 
-                ScrollView {
-                    VStack(spacing: 5) {
-                        ForEach(mailerCategories, id: \.self) { category in
-                            SelectableRow(
-                                title: category.rawValue.capitalized,
-                                isSelected: selectedCategory == category,
-                                animationDuration: 0.3
-                            ) {
-                                // withAnimation(.easeInOut(duration: 0.2)) {
-                                  selectedCategory = category
-                                  resetFileIfInvalid()
-                                // }
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                }
-            }
-            .frame(width: 150)
-
-            VStack {
-                SectionTitle(title: "File", width: 150)
-
-                ScrollView {
-                    VStack(spacing: 5) {
-                        ForEach(availableFiles, id: \.self) { file in
-                            SelectableRow(
-                                    title: file.rawValue.capitalized,
-                                    isSelected: selectedFile == file
+                        ScrollView {
+                            VStack(spacing: 5) {
+                                ForEach(mailerCategories, id: \.self) { category in
+                                    SelectableRow(
+                                        title: category.rawValue.capitalized,
+                                        isSelected: selectedCategory == category,
+                                        animationDuration: 0.3
                                     ) {
-                                // withAnimation(.easeInOut(duration: 0.2)) {
-                                    selectedFile = file
-                                // }
+                                        // withAnimation(.easeInOut(duration: 0.2)) {
+                                          selectedCategory = category
+                                          resetFileIfInvalid()
+                                        // }
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                }
                             }
-                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal)
+                            .padding(.vertical, 8)
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                }
+                    .frame(width: 150)
 
-                if (disabledFileSelected) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.headline)
-                            .accessibilityHidden(true)
+                    VStack {
+                        SectionTitle(title: "File", width: 150)
 
-                        Text("Select a template for this category")
-                        .font(.subheadline)
-                        .bold()
+                        ScrollView {
+                            VStack(spacing: 5) {
+                                ForEach(availableFiles, id: \.self) { file in
+                                    SelectableRow(
+                                            title: file.rawValue.capitalized,
+                                            isSelected: selectedFile == file
+                                            ) {
+                                        // withAnimation(.easeInOut(duration: 0.2)) {
+                                            selectedFile = file
+                                        // }
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                }
+                            }
+                            .padding(.horizontal)
+                            .padding(.vertical, 8)
+                        }
+
+                        // if (disabledFileSelected) {
+                        //     HStack(spacing: 8) {
+                        //         Image(systemName: "exclamationmark.triangle.fill")
+                        //             .font(.headline)
+                        //             .accessibilityHidden(true)
+
+                        //         Text("Select a template for this category")
+                        //         .font(.subheadline)
+                        //         .bold()
+                        //     }
+                        //     .foregroundColor(.black)
+                        //     .padding(.vertical, 10)
+                        //     .padding(.horizontal, 16)
+                        //     .background(Color.yellow)
+                        //     .cornerRadius(8)
+                        //     .padding(.horizontal)
+                        //     .transition(.move(edge: .top).combined(with: .opacity))
+                        //     .animation(.easeInOut, value: (disabledFileSelected))
+                        // }
+
                     }
-                    .foregroundColor(.black)
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 16)
-                    .background(Color.yellow)
-                    .cornerRadius(8)
-                    .padding(.horizontal)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .animation(.easeInOut, value: (disabledFileSelected))
+                    .frame(width: 150)
                 }
 
+                if disabledFileSelected {
+                    NotificationBanner(
+                        type: .warning,
+                        message: "Select a template for this category"
+                    )
+
+                }
             }
-            .frame(width: 150)
 
             // VStack {
             //     Text("File").bold()
