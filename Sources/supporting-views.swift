@@ -4,6 +4,19 @@ struct SelectableRow: View {
     let title: String
     let isSelected: Bool
     let action: () -> Void
+    let animationDuration: TimeInterval
+
+    init(
+      title: String,
+      isSelected: Bool,
+      animationDuration: Double = 0.2,
+      action: @escaping () -> Void
+    ) {
+      self.title = title
+      self.isSelected = isSelected
+      self.animationDuration = animationDuration
+      self.action = action
+    }
 
     var body: some View {
         HStack {
@@ -37,11 +50,11 @@ struct SelectableRow: View {
             color: isSelected ? Color.blue.opacity(0.1) : Color.white,
             radius: 5
         )
-        .contentShape(RoundedRectangle(    // make the *entire* rounded box tappable
+        .contentShape(RoundedRectangle(
           cornerRadius: 5
         ))
         .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(.easeInOut(duration: animationDuration)) {
                 action()
             }
             // action()
@@ -52,6 +65,14 @@ struct SelectableRow: View {
 struct SectionTitle: View {
     let title: String
     let width: CGFloat
+
+    init(
+      title: String,
+      width: CGFloat = 350,
+    ) {
+      self.title = title
+      self.width = width
+    }
 
     var body: some View {
         VStack(alignment: .center) {

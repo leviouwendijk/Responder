@@ -378,7 +378,8 @@ struct ResponderView: View {
                         ForEach(mailerCategories, id: \.self) { category in
                             SelectableRow(
                                 title: category.rawValue.capitalized,
-                                isSelected: selectedCategory == category
+                                isSelected: selectedCategory == category,
+                                animationDuration: 0.3
                             ) {
                                 // withAnimation(.easeInOut(duration: 0.2)) {
                                   selectedCategory = category
