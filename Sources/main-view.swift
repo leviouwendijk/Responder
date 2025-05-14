@@ -202,6 +202,10 @@ struct ResponderView: View {
         }
     }
 
+    private var availableFiles: [MailerFile] {
+        validFilesForCategory[selectedCategory] ?? []
+    }
+
     @State private var weeklySchedule = Dictionary(
         uniqueKeysWithValues: Weekday.allCases.map {
             ($0, DaySchedule(defaultsFor: $0))
@@ -265,6 +269,10 @@ struct ResponderView: View {
 
     private var emptyEmailWarning: Bool {
         return email.isEmpty
+    }
+
+    private var disabledFileSelected: Bool {
+        return isFileDisabled(selectedFile)
     }
 
     private var anyInvalidConditionsCheck: Bool {
@@ -357,49 +365,122 @@ struct ResponderView: View {
     @State private var subject: String = ""
 
     @State private var includeQuoteInCustomMessage = false
+    @State private var showErrorPane = false
 
     var body: some View {
         HStack {
             VStack {
-                Text("Category").bold()
-                List(mailerCategories, id: \.self) { category in
-                    Button(action: { 
-                        selectedCategory = category
-                        resetFileIfInvalid()
-                    }) {
-                        Text("\(category.rawValue.capitalized)")
-                            .frame(maxWidth: .infinity, minHeight: 40) 
-                            .padding()
-                            .background(selectedCategory == category ? Color.blue.opacity(0.3) : Color.clear)
-                            .clipShape(RoundedRectangle(cornerRadius: 8)) 
+                // Text("Category").bold()
+                SectionTitle(title: "Category", width: 150)
+
+                ScrollView {
+                    VStack(spacing: 5) {
+                        ForEach(mailerCategories, id: \.self) { category in
+                            SelectableRow(
+                                title: category.rawValue.capitalized,
+                                isSelected: selectedCategory == category
+                            ) {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                  selectedCategory = category
+                                  resetFileIfInvalid()
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
                     }
-                    .contentShape(Rectangle()) 
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
                 }
-                .scrollContentBackground(.hidden)
             }
-            .frame(width: 140)
+            .frame(width: 150)
 
             VStack {
-                Text("File").bold()
-                List(mailerFiles, id: \.self) { file in
-                    Button(action: { 
-                        if !isFileDisabled(file) { 
-                            selectedFile = file 
+                SectionTitle(title: "File", width: 150)
+
+                ScrollView {
+                    VStack(spacing: 5) {
+                        ForEach(availableFiles, id: \.self) { file in
+                            SelectableRow(
+                                    title: file.rawValue.capitalized,
+                                    isSelected: selectedFile == file
+                                    ) {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    selectedFile = file
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
                         }
-                    }) {
-                        Text(file.rawValue.capitalized)
-                            .frame(maxWidth: .infinity, minHeight: 40)
-                            .padding()
-                            .background(selectedFile == file ? Color.blue.opacity(0.3) : Color.clear)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .opacity(isFileDisabled(file) ? 0.5 : 1.0) // Reduce opacity if disabled
                     }
-                    .contentShape(Rectangle())
-                    .disabled(isFileDisabled(file)) // Disable the button when not allowed
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
                 }
-                .scrollContentBackground(.hidden)
+
+                if (disabledFileSelected) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.headline)
+                            .accessibilityHidden(true)
+
+                        Text("Select a template for this category")
+                        .font(.subheadline)
+                        .bold()
+                    }
+                    .foregroundColor(.black)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 16)
+                    .background(Color.yellow)
+                    .cornerRadius(8)
+                    .padding(.horizontal)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .animation(.easeInOut, value: (disabledFileSelected))
+                }
+
             }
-            .frame(width: 140)
+            .frame(width: 150)
+
+            // VStack {
+            //     Text("File").bold()
+
+            //     List(mailerFiles, id: \.self) { file in
+            //         Button(action: { 
+            //             if !isFileDisabled(file) { 
+            //                 selectedFile = file 
+            //             }
+            //         }) {
+            //             Text(file.rawValue.capitalized)
+            //                 .frame(maxWidth: .infinity, minHeight: 16)
+            //                 .padding()
+            //                 .background(selectedFile == file ? Color.blue.opacity(0.3) : Color.clear)
+            //                 .clipShape(RoundedRectangle(cornerRadius: 8))
+            //                 .opacity(isFileDisabled(file) ? 0.5 : 1.0) // Reduce opacity if disabled
+            //         }
+            //         .contentShape(Rectangle())
+            //         .disabled(isFileDisabled(file)) // Disable the button when not allowed
+            //     }
+            //     .scrollContentBackground(.hidden)
+
+            //     if (disabledFileSelected) {
+            //         HStack(spacing: 8) {
+            //             Image(systemName: "exclamationmark.triangle.fill")
+            //                 .font(.headline)
+            //                 .accessibilityHidden(true)
+
+            //             Text("Select a template for this category")
+            //             .font(.subheadline)
+            //             .bold()
+            //         }
+            //         .foregroundColor(.black)
+            //         .padding(.vertical, 10)
+            //         .padding(.horizontal, 16)
+            //         .background(Color.yellow)
+            //         .cornerRadius(8)
+            //         .padding(.horizontal)
+            //         .transition(.move(edge: .top).combined(with: .opacity))
+            //         .animation(.easeInOut, value: (disabledFileSelected))
+            //     }
+
+            // }
+            // .frame(width: 140)
 
 
 
@@ -429,6 +510,26 @@ struct ResponderView: View {
                         TextField("Search Contacts", text: $searchQuery)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .padding(.horizontal)
+
+                        if (anyInvalidConditionsCheck && contactExtractionError) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.headline)
+                                    .accessibilityHidden(true)
+
+                                Text("ContactExtractionError: client or dog name is invalid")
+                                .font(.subheadline)
+                                .bold()
+                            }
+                            .foregroundColor(.white)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 16)
+                            .background(Color.red)
+                            .cornerRadius(8)
+                            .padding(.horizontal)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && contactExtractionError))
+                        }
 
                         // Contact List
                         List(filteredContacts, id: \.identifier) { contact in
@@ -477,9 +578,29 @@ struct ResponderView: View {
                     } else {
                         TextField("Client (variable: \"{{name}}\"", text: $client)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
-                        
+
                         TextField("Email (accepts comma-separated values)", text: $email)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
+
+                        if (anyInvalidConditionsCheck && emptyEmailWarning) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.headline)
+                                    .accessibilityHidden(true)
+
+                                Text("emptyEmailWarning: fill out an email or multiple")
+                                .font(.subheadline)
+                                .bold()
+                            }
+                            .foregroundColor(.black)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 16)
+                            .background(Color.yellow)
+                            .cornerRadius(8)
+                            .padding(.horizontal)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && emptyEmailWarning))
+                        }
                         
                         TextField("Dog (variable: \"{{dog}}\"", text: $dog)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -603,14 +724,58 @@ struct ResponderView: View {
 
                 if isCustomCategorySelected {
                     VStack(alignment: .leading) {
+
                         TextField("Subject", text: $subject)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
 
+                        if (anyInvalidConditionsCheck && emptySubjectWarning) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.headline)
+                                    .accessibilityHidden(true)
+
+                                Text("emptySubjectWarning: fill out a subject")
+                                .font(.subheadline)
+                                .bold()
+                            }
+                            .foregroundColor(.black)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 16)
+                            .background(Color.yellow)
+                            .cornerRadius(8)
+                            .padding(.horizontal)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && emptySubjectWarning))
+                        }
+
+
                         Text("Template HTML").bold()
+
                         TextEditor(text: $fetchedHtml)
                         .font(.system(.body, design: .monospaced))
                         .border(Color.gray)
                         .frame(minHeight: 300)
+                        // .frame(minWidth: 300)
+
+                        if (anyInvalidConditionsCheck && finalHtmlContainsRawVariables) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.headline)
+                                    .accessibilityHidden(true)
+
+                                Text("Please replace all raw template variables before sending.")
+                                    .font(.subheadline)
+                                    .bold()
+                            }
+                            .foregroundColor(.white)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 16)
+                            .background(Color.red)
+                            .cornerRadius(8)
+                            .padding(.horizontal)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && finalHtmlContainsRawVariables))
+                        }
 
                         Button("clear html") {
                             fetchedHtml = ""
@@ -685,102 +850,131 @@ struct ResponderView: View {
                         .animation(.easeInOut(duration: 0.3), value: isSendingEmail)
                     }
 
-                    if (anyInvalidConditionsCheck && emptySubjectWarning) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.headline)
-                                .accessibilityHidden(true)
-
-                            Text("emptySubjectWarning: fill out a subject")
-                            .font(.subheadline)
-                            .bold()
-                        }
-                        .foregroundColor(.black)
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 16)
-                        .background(Color.yellow)
-                        .cornerRadius(8)
-                        .padding(.horizontal)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .animation(.easeInOut, value: (anyInvalidConditionsCheck && emptySubjectWarning))
-                    }
-
-                    if (anyInvalidConditionsCheck && emptyEmailWarning) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.headline)
-                                .accessibilityHidden(true)
-
-                            Text("emptyEmailWarning: fill out an email or multiple")
-                            .font(.subheadline)
-                            .bold()
-                        }
-                        .foregroundColor(.black)
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 16)
-                        .background(Color.yellow)
-                        .cornerRadius(8)
-                        .padding(.horizontal)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .animation(.easeInOut, value: (anyInvalidConditionsCheck && emptyEmailWarning))
-                    }
-
-                    if (anyInvalidConditionsCheck && contactExtractionError) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.headline)
-                                .accessibilityHidden(true)
-
-                            Text("ContactExtractionError: client or dog name is invalid")
-                            .font(.subheadline)
-                            .bold()
-                        }
-                        .foregroundColor(.white)
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 16)
-                        .background(Color.red)
-                        .cornerRadius(8)
-                        .padding(.horizontal)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .animation(.easeInOut, value: (anyInvalidConditionsCheck && contactExtractionError))
-                    }
-
-                    if (anyInvalidConditionsCheck && finalHtmlContainsRawVariables) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.headline)
-                                .accessibilityHidden(true)
-
-                            Text("Please replace all raw template variables before sending.")
-                                .font(.subheadline)
-                                .bold()
-                        }
-                        .foregroundColor(.white)
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 16)
-                        .background(Color.red)
-                        .cornerRadius(8)
-                        .padding(.horizontal)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .animation(.easeInOut, value: (anyInvalidConditionsCheck && finalHtmlContainsRawVariables))
-                    }
-
                     HStack {
                         Button(action: sendMailerEmail) {
                             Label("Start mailer process", systemImage: "paperplane.fill")
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(isSendingEmail || anyInvalidConditionsCheck)
+                        .disabled(isSendingEmail || anyInvalidConditionsCheck || disabledFileSelected)
                     }
                     .padding(.top, 10)
                 }
             }
-            .frame(width: 400)
+            .frame(width: 700)
             
             // new stdout pane:
             Divider()
 
             VStack(alignment: .leading) {
+                Toggle("Show Central Error Pane", isOn: $showErrorPane)
+                if showErrorPane {
+                    Text("Central Error Pane").bold()
+                    ScrollView {
+                        if (disabledFileSelected) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.headline)
+                                    .accessibilityHidden(true)
+
+                                Text("Select a template for this category")
+                                .font(.subheadline)
+                                .bold()
+                            }
+                            .foregroundColor(.black)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 16)
+                            .background(Color.yellow)
+                            .cornerRadius(8)
+                            .padding(.horizontal)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .animation(.easeInOut, value: (disabledFileSelected))
+                        }
+
+                        if (anyInvalidConditionsCheck && emptySubjectWarning) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.headline)
+                                    .accessibilityHidden(true)
+
+                                Text("emptySubjectWarning: fill out a subject")
+                                .font(.subheadline)
+                                .bold()
+                            }
+                            .foregroundColor(.black)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 16)
+                            .background(Color.yellow)
+                            .cornerRadius(8)
+                            .padding(.horizontal)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && emptySubjectWarning))
+                        }
+
+                        if (anyInvalidConditionsCheck && emptyEmailWarning) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.headline)
+                                    .accessibilityHidden(true)
+
+                                Text("emptyEmailWarning: fill out an email or multiple")
+                                .font(.subheadline)
+                                .bold()
+                            }
+                            .foregroundColor(.black)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 16)
+                            .background(Color.yellow)
+                            .cornerRadius(8)
+                            .padding(.horizontal)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && emptyEmailWarning))
+                        }
+
+                        if (anyInvalidConditionsCheck && contactExtractionError) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.headline)
+                                    .accessibilityHidden(true)
+
+                                Text("ContactExtractionError: client or dog name is invalid")
+                                .font(.subheadline)
+                                .bold()
+                            }
+                            .foregroundColor(.white)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 16)
+                            .background(Color.red)
+                            .cornerRadius(8)
+                            .padding(.horizontal)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && contactExtractionError))
+                        }
+
+                        if (anyInvalidConditionsCheck && finalHtmlContainsRawVariables) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.headline)
+                                    .accessibilityHidden(true)
+
+                                Text("Please replace all raw template variables before sending.")
+                                    .font(.subheadline)
+                                    .bold()
+                            }
+                            .foregroundColor(.white)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 16)
+                            .background(Color.red)
+                            .cornerRadius(8)
+                            .padding(.horizontal)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && finalHtmlContainsRawVariables))
+                        }
+                    }
+                    .background(Color.black.opacity(0.05))
+                    .cornerRadius(6)
+                    .frame(maxHeight: 300)
+                }
+
                 Text("Mailer Log").bold()
                     ScrollView {
                         Text(mailerOutput)
@@ -1273,11 +1467,11 @@ struct ContentView: View {
     }
 }
 
-@main
-struct ResponderApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
-    }
-}
+// @main
+// struct ResponderApp: App {
+//     var body: some Scene {
+//         WindowGroup {
+//             ContentView()
+//         }
+//     }
+// }
