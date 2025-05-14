@@ -380,10 +380,10 @@ struct ResponderView: View {
                                 title: category.rawValue.capitalized,
                                 isSelected: selectedCategory == category
                             ) {
-                                withAnimation(.easeInOut(duration: 0.2)) {
+                                // withAnimation(.easeInOut(duration: 0.2)) {
                                   selectedCategory = category
                                   resetFileIfInvalid()
-                                }
+                                // }
                             }
                             .frame(maxWidth: .infinity)
                         }
@@ -404,9 +404,9 @@ struct ResponderView: View {
                                     title: file.rawValue.capitalized,
                                     isSelected: selectedFile == file
                                     ) {
-                                withAnimation(.easeInOut(duration: 0.2)) {
+                                // withAnimation(.easeInOut(duration: 0.2)) {
                                     selectedFile = file
-                                }
+                                // }
                             }
                             .frame(maxWidth: .infinity)
                         }

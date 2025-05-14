@@ -41,7 +41,10 @@ struct SelectableRow: View {
           cornerRadius: 5
         ))
         .onTapGesture {
-            action()
+            withAnimation(.easeInOut(duration: 0.2)) {
+                action()
+            }
+            // action()
         }
     }
 }
