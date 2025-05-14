@@ -369,6 +369,7 @@ struct ResponderView: View {
 
     var body: some View {
         HStack {
+            // SwipeFadeContainer(threshold: 80, animationDuration: 0.25) {
             VStack {
                 HStack {
                     VStack {
@@ -451,6 +452,8 @@ struct ResponderView: View {
                 }
             }
 
+            // }
+
             // VStack {
             //     Text("File").bold()
 
@@ -503,13 +506,29 @@ struct ResponderView: View {
                 VStack {
                     if !(isCustomCategorySelected && selectedFile == .template) {
                         HStack {
-                            Button("Load Contacts") {
+
+                            StandardButton(
+                                type: .load, 
+                                title: "Load contacts"
+                            ) {
                                 requestContactsAccess()
                             }
 
+                            // Button("Load Contacts") {
+                            //     requestContactsAccess()
+                            // }
+
                             Spacer()
 
-                            Toggle("Local Location", isOn: $local)
+                            // Toggle("Local Location", isOn: $local)
+
+                            StandardToggle(
+                                style: .switch,
+                                isOn: $local,
+                                title: "Local Location",
+                                subtitle: nil
+                            )
+
                             // .padding()
                         }
 
@@ -596,23 +615,10 @@ struct ResponderView: View {
                             .textFieldStyle(RoundedBorderTextFieldStyle())
 
                         if (anyInvalidConditionsCheck && emptyEmailWarning) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.headline)
-                                    .accessibilityHidden(true)
-
-                                Text("emptyEmailWarning: fill out an email or multiple")
-                                .font(.subheadline)
-                                .bold()
-                            }
-                            .foregroundColor(.black)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 16)
-                            .background(Color.yellow)
-                            .cornerRadius(8)
-                            .padding(.horizontal)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && emptyEmailWarning))
+                            NotificationBanner(
+                                type: .warning,
+                                message: "Fill out an email (or multiple)"
+                            )
                         }
                         
                         TextField("Dog (variable: \"{{dog}}\"", text: $dog)
@@ -643,23 +649,52 @@ struct ResponderView: View {
                         .textFieldStyle(RoundedBorderTextFieldStyle())
 
                         HStack {
-                            Button("Clear contact") {
+                            // Button("Clear contact") {
+                            //     clearContact()
+                            // }
+
+                            StandardButton(
+                                type: .clear, 
+                                title: "Clear contact", 
+                                subtitle: "clears contact fields"
+                            ) {
                                 clearContact()
                             }
+
 
                             Spacer()
 
                             if selectedFile == .message {
-                                Button("Memo") {
+                                // Button("Memo") {
+                                //     email = "casper@hondenmeesters.nl, shusha@hondenmeesters.nl, levi@hondenmeesters.nl"
+                                //     if fetchedHtml.isEmpty {
+                                //         fetchedHtml = htmlDoc
+                                //     }
+                                // }
+
+                                StandardButton(
+                                    type: .load, 
+                                    title: "Memo", 
+                                    subtitle: "sets memo emails"
+                                ) {
                                     email = "casper@hondenmeesters.nl, shusha@hondenmeesters.nl, levi@hondenmeesters.nl"
 
                                     if fetchedHtml.isEmpty {
                                         fetchedHtml = htmlDoc
                                     }
                                 }
+
                                 // .padding()
 
-                                Toggle("Include quote", isOn: $includeQuoteInCustomMessage)
+                                // Toggle("Include quote", isOn: $includeQuoteInCustomMessage)
+
+                                StandardToggle(
+                                    style: .switch,
+                                    isOn: $includeQuoteInCustomMessage,
+                                    title: "Include quote",
+                                    subtitle: nil,
+                                    width: 150
+                                )
                                 // .padding()
                             }
                         }
@@ -742,23 +777,10 @@ struct ResponderView: View {
                             .textFieldStyle(RoundedBorderTextFieldStyle())
 
                         if (anyInvalidConditionsCheck && emptySubjectWarning) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.headline)
-                                    .accessibilityHidden(true)
-
-                                Text("emptySubjectWarning: fill out a subject")
-                                .font(.subheadline)
-                                .bold()
-                            }
-                            .foregroundColor(.black)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 16)
-                            .background(Color.yellow)
-                            .cornerRadius(8)
-                            .padding(.horizontal)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && emptySubjectWarning))
+                            NotificationBanner(
+                                type: .warning,
+                                message: "Fill out a subject"
+                            )
                         }
 
 
@@ -771,28 +793,25 @@ struct ResponderView: View {
                         // .frame(minWidth: 300)
 
                         if (anyInvalidConditionsCheck && finalHtmlContainsRawVariables) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.headline)
-                                    .accessibilityHidden(true)
-
-                                Text("Please replace all raw template variables before sending.")
-                                    .font(.subheadline)
-                                    .bold()
-                            }
-                            .foregroundColor(.white)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 16)
-                            .background(Color.red)
-                            .cornerRadius(8)
-                            .padding(.horizontal)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && finalHtmlContainsRawVariables))
+                            NotificationBanner(
+                                type: .warning,
+                                message: "Raw html variables still in your message"
+                            )
                         }
 
-                        Button("clear html") {
+                        StandardButton(
+                            type: .clear, 
+                            title: "Clear HTML", 
+                            subtitle: "clears fetched html"
+                        ) {
                             fetchedHtml = ""
                         }
+
+                        // .disabled(true) // testing the disabled view of std buttons
+
+                        // Button("clear html") {
+                        //     fetchedHtml = ""
+                        // }
                         .padding()
                     }
                     .padding()
@@ -864,11 +883,21 @@ struct ResponderView: View {
                     }
 
                     HStack {
-                        Button(action: sendMailerEmail) {
-                            Label("Start mailer process", systemImage: "paperplane.fill")
+                        // Button(action: sendMailerEmail) {
+                        //     Label("Start mailer process", systemImage: "paperplane.fill")
+                        // }
+                        // .buttonStyle(.borderedProminent)
+                        // .disabled(isSendingEmail || anyInvalidConditionsCheck || disabledFileSelected)
+
+                        StandardButton(
+                            type: .execute, 
+                            title: "Run mailer", 
+                            subtitle: "Starts mailer background process"
+                        ) {
+                            sendMailerEmail()
                         }
-                        .buttonStyle(.borderedProminent)
                         .disabled(isSendingEmail || anyInvalidConditionsCheck || disabledFileSelected)
+
                     }
                     .padding(.top, 10)
                 }
@@ -879,7 +908,14 @@ struct ResponderView: View {
             Divider()
 
             VStack(alignment: .leading) {
-                Toggle("Show Central Error Pane", isOn: $showErrorPane)
+                // Toggle("Show Central Error Pane", isOn: $showErrorPane)
+                StandardToggle(
+                    style: .switch,
+                    isOn: $showErrorPane,
+                    title: "Show Error Pane",
+                    subtitle: nil,
+                    width: 150
+                )
                 if showErrorPane {
                     Text("Central Error Pane").bold()
                     ScrollView {
