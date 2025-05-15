@@ -796,37 +796,39 @@ struct Responder: View {
                     }
                     .padding()
                 } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Week-/time availability").bold()
 
-                        // grid two-column: day + controls
-                        ForEach(Weekday.allCases) { day in
-                          HStack(spacing: 12) {
-                            Toggle(day.abbr, isOn: Binding(
-                              get: { weeklySchedule[day]!.enabled },
-                              set: { weeklySchedule[day]!.enabled = $0 }
-                            ))
-                            .toggleStyle(.switch)
+                    if needsAvailability {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Week-/time availability").bold()
 
-                            if weeklySchedule[day]!.enabled {
-                              DatePicker("", selection: Binding(
-                                get: { weeklySchedule[day]!.start },
-                                set: { weeklySchedule[day]!.start = $0 }
-                              ), displayedComponents: .hourAndMinute)
-                              .labelsHidden()
-                              .datePickerStyle(.compact)
+                            ForEach(Weekday.allCases) { day in
+                                HStack(spacing: 12) {
+                                    Toggle(day.abbr, isOn: Binding(
+                                      get: { weeklySchedule[day]!.enabled },
+                                      set: { weeklySchedule[day]!.enabled = $0 }
+                                    ))
+                                    .toggleStyle(.switch)
 
-                              DatePicker("", selection: Binding(
-                                get: { weeklySchedule[day]!.end },
-                                set: { weeklySchedule[day]!.end = $0 }
-                              ), displayedComponents: .hourAndMinute)
-                              .labelsHidden()
-                              .datePickerStyle(.compact)
+                                    if weeklySchedule[day]!.enabled {
+                                        DatePicker("", selection: Binding(
+                                            get: { weeklySchedule[day]!.start },
+                                            set: { weeklySchedule[day]!.start = $0 }
+                                        ), displayedComponents: .hourAndMinute)
+                                        .labelsHidden()
+                                        .datePickerStyle(.compact)
+
+                                        DatePicker("", selection: Binding(
+                                            get: { weeklySchedule[day]!.end },
+                                            set: { weeklySchedule[day]!.end = $0 }
+                                        ), displayedComponents: .hourAndMinute)
+                                        .labelsHidden()
+                                        .datePickerStyle(.compact)
+                                    }
+                                }
                             }
-                          }
                         }
+                        .padding(.vertical, 8)
                     }
-                    .padding(.vertical, 8)
                 }
 
                 Spacer()
