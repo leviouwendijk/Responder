@@ -458,10 +458,16 @@ struct Responder: View {
 
                 if disabledFileSelected {
                     NotificationBanner(
-                        type: .warning,
-                        message: "Select a template for this category"
+                        type: .info,
+                        message: "No template selected"
                     )
+                }
 
+                if selectedCategory == .invoice {
+                    NotificationBanner(
+                        type: .error,
+                        message: "these are not quotes casper!"
+                    )
                 }
             }
 
@@ -633,8 +639,8 @@ struct Responder: View {
 
                         if (anyInvalidConditionsCheck && emptyEmailWarning) {
                             NotificationBanner(
-                                type: .warning,
-                                message: "Fill out an email (or multiple)"
+                                type: .info,
+                                message: "No email specified"
                             )
                         }
                         
@@ -748,8 +754,8 @@ struct Responder: View {
 
                         if (anyInvalidConditionsCheck && emptySubjectWarning) {
                             NotificationBanner(
-                                type: .warning,
-                                message: "Fill out a subject"
+                                type: .info,
+                                message: "Empty subject"
                             )
                         }
 
@@ -854,6 +860,13 @@ struct Responder: View {
                         .padding(.bottom, 10)
                         .transition(.opacity)
                         .animation(.easeInOut(duration: 0.3), value: isSendingEmail)
+                    }
+
+                    if selectedCategory == .invoice && selectedFile == .expired {
+                        NotificationBanner(
+                            type: .warning,
+                            message: "You are sending an overdue reminder"
+                        )
                     }
 
                     HStack {

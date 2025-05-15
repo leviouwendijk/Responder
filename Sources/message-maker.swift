@@ -30,7 +30,6 @@ struct MessageMakerView: View {
                 .onSubmit {
                     makeQuickMessage()
                 }
-                .frame(maxWidth: 500)
 
                 HStack {
                     Button(action: makeQuickMessage) {
@@ -53,10 +52,10 @@ struct MessageMakerView: View {
                     .padding()
                     .background(Color.gray.opacity(0.2))
                     .cornerRadius(5)
-                    .frame(minWidth: 350, maxWidth: 800)
                 }
                 .buttonStyle(PlainButtonStyle())
             }
+            .frame(maxWidth: 500)
         }
         .alert(isPresented: $showAlert) {
             Alert(
@@ -68,8 +67,7 @@ struct MessageMakerView: View {
     }
 
     private func makeQuickMessage() {
-        // let arguments = "\"\(client)\" \"\(dog)\" \(messageMakerTemplate)"
-        let arguments = ""
+        let arguments = "\"\(client)\" \"\(dog)\" \(messageMakerTemplate)"
         // Execute on a background thread to avoid blocking the UI
         DispatchQueue.global(qos: .userInitiated).async {
             do {
