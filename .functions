@@ -1,0 +1,655 @@
+# Core functions
+shortcut_init() {
+    for cmd in "$@"; do
+        if [ -n "$cmd" ]; then
+            eval "$cmd"
+        fi
+    done
+}
+
+multi_cd() {
+    for dir in "$@"; do
+        if [ -d "$dir" ]; then  # Check if the directory exists
+            cd "$dir" || return 1  # Change to the directory, and exit on failure
+        else
+            echo "Directory '$dir' does not exist"
+            return 1
+        fi
+    done
+}
+
+line_spacer() {
+    echo "--------------------------------------"
+}
+
+update_docs_toc() {
+    local FILE="/Users/leviouwendijk/myworkdir/programming/websites/www-hondenmeesters/domain/docs.hondenmeesters.nl/assets/json/toc.json"
+    curl -H "x-api-key: $INFORMER_API_KEY" https://api2.hondenmeesters.nl/informer/v1/docs/toc | jq > $FILE
+    cat $FILE
+}
+
+alias "update_docs"=update_docs_toc
+
+ip10() {
+    echo ""
+    line_spacer
+    echo ""
+    echo "10.xxx.xxx.xxx range:"
+    echo ""
+    ifconfig | grep "10\.[0-9]*\.[0-9]*\.[0-9]*"
+    echo ""
+    line_spacer
+    echo ""
+}
+
+myip() {
+    line_spacer
+    echo "10.xx.xx.xx range:"
+    ifconfig | grep "10\.[0-9]*\.[0-9]*\.[0-9]*"
+    line_spacer
+    echo ""
+    echo "192.xx.xx.xx range:"
+    ifconfig | grep "192\.[0-9]*\.[0-9]*\.[0-9]*"
+    line_spacer
+    echo ""
+    echo "178.xx.xx.xx range:"
+    ifconfig | grep "178\.[0-9]*\.[0-9]*\.[0-9]*"
+    line_spacer
+    echo ""
+}
+
+neomutt_open() {
+    local account="$1"
+
+    if [[ ! -f "$HOME/.config/neomutt/accounts/$account" ]]; then
+        echo "Error: File '$account' does not exist."
+        return 1
+    fi
+
+    echo "Opening $account..."
+    neomutt -F ~/.config/neomutt/accounts/$account
+}
+
+function copy_last_command() {
+    fc -ln -1 | pbcopy
+    echo "Last command copied to clipboard."
+}
+
+function copy_last_output() {
+    eval "$(fc -ln -1)" | pbcopy
+    echo "Last command output copied to clipboard."
+}
+
+function copy_last_command_and_output() {
+    {
+        echo "Command:"
+        fc -ln -1
+        echo "\nOutput:"
+        eval "$(fc -ln -1)"
+    } | pbcopy
+    echo "Last command and its output copied to clipboard."
+}
+
+restart_ssh() {
+    # macOS
+    sudo launchctl stop com.openssh.sshd
+    sudo launchctl start com.openssh.sshd
+}
+
+validate_json() {
+    local filename="$1"
+
+    if [[ ! -f "$filename" ]]; then
+        echo "Error: File '$filename' does not exist."
+        return 1
+    fi
+
+    local json_content
+    json_content=$(cat "$filename")
+
+    python3 - <<EOF
+import json
+
+json_string = """$json_content"""
+try:
+    json.loads(json_string)
+    print("JSON is valid")
+except json.JSONDecodeError as e:
+    print("Invalid JSON:", e)
+EOF
+}
+
+# Spinner function
+# spinner() {
+#     local pid=$1
+#     local delay=0.1
+#     local spinstr='|/-\'
+#     while kill -0 "$pid" 2>/dev/null; do
+#         local temp=${spinstr#?}
+#         printf " [%c]  " "$spinstr"
+#         local spinstr="$temp${spinstr%"$temp"}"
+#         sleep "$delay"
+#         printf "\b\b\b\b\b\b"
+#     done
+#     printf "    \b\b\b\b"
+# }
+
+resource() {
+    source ~/.zshrc
+}
+
+short() {
+    shortcut_init "$@"
+}
+
+nvim_explore() {
+    if [ "$#" -eq 0 ]; then
+        # No arguments passed, open nvim in explore mode
+        nvim -c "Ex"
+    else
+        # Argument passed, open nvim with the argument(s)
+        nvim "$@"
+    fi
+}
+
+vimex() {
+    nvim_explore
+}
+
+gippety() {
+    short "multi_cd ~/myworkdir programming .notes"
+    nvim gpt-chat-index.md
+}
+
+configs_linovim() {
+    short "multi_cd ~/myworkdir programming configs"
+    nvim_explore
+}
+
+transformers() {
+    short "multi_cd ~/myworkdir programming env" \
+        "source transformers-env/bin/activate"
+}
+
+counter-archive() {
+    short "multi_cd ~/myworkdir programming applications .archive counter" vimex
+}
+
+
+neowork() {
+    short "multi_cd ~/myworkdir neorg work" vimex
+}
+
+neoworkj() {
+    short "multi_cd ~/myworkdir neorg work journal" vimex
+}
+
+writingdirs() {
+    echo ""
+    echo "z into the following directories:"
+    echo ""
+    ls
+    echo ""
+}
+
+neowrite() {
+    short "multi_cd ~/myworkdir neorg write" writingdirs
+}
+
+shimmers-of-being() {
+    short "multi_cd ~/myworkdir neorg write shimmers-of-being" vimex
+}
+
+enumerations() {
+    short "multi_cd ~/myworkdir neorg write enumerations" vimex
+}
+
+levenden-schrijven() {
+    short "multi_cd ~/myworkdir neorg write levenden-schrijven" vimex
+}
+
+# Function calls
+helpdir() {
+    short "multi_cd ~/myworkdir programming .help" vimex
+}
+
+reusable() {
+    short "multi_cd ~/myworkdir programming .reusable" vimex
+}
+
+applications() {
+    short "multi_cd ~/myworkdir programming applications" vimex
+}
+
+scratchcodingdir() {
+    short "multi_cd ~/myworkdir programming scratchcodingdir" vimex
+}
+
+scripts() {
+    short "multi_cd ~/myworkdir programming scripts" vimex
+}
+
+server() {
+    short "multi_cd ~/myworkdir programming server" vimex
+}
+
+dedicated_server() {
+    short "multi_cd ~/myworkdir programming server dedicated-server" vimex
+}
+
+vuejs() {
+    short "multi_cd ~/myworkdir programming vue.js" vimex
+}
+
+# ( Neorg )
+neorg() {
+    short "multi_cd ~/myworkdir neorg" vimex
+}
+
+dotfiles() {
+    short "multi_cd ~/dotfiles" vimex
+}
+
+vimconfig() {
+	cd ~/.config/nvim
+	nvim -c  "Ex"
+}
+
+function generate_server_brewfile() {
+    local main_brewfile=~/dotfiles/.brewfile
+    local exclude_list=~/dotfiles/.brewfile-exclude
+    local server_brewfile=~/dotfiles/.brewfile-server
+
+    # Exclude listed items and save the filtered result
+    grep -vxFf "$exclude_list" "$main_brewfile" > "$server_brewfile"
+
+    echo "Brewfile for server (lightweight): $server_brewfile"
+}
+
+function generate_luarocksfile() {
+    luarocks list > ~/dotfiles/.luarocksfile
+    echo "Luarocks list file generated also"
+}
+
+function generate_npmfile() {
+    npm list -g --depth=0 > ~/dotfiles/.npmfile
+    echo "npm list file generated also"
+}
+
+function generate_pipfile() {
+    pip list --format=freeze > ~/dotfiles/.pipfile
+    echo "pip list file generated also"
+}
+
+function update_brewfile() {
+    brew bundle dump --file=~/dotfiles/.brewfile --force
+    echo "Brewfile updated!"
+    generate_server_brewfile
+    generate_luarocksfile
+    generate_npmfile
+    generate_pipfile
+}
+
+# function for the server:
+function uninstall_excluded_packages() {
+    # Use the first argument as the exclude file path, or fall back to a default
+    local exclude_list=${1:-~/.pakker/dotfiles/.brewfile-exclude}
+
+    # Check if the file exists
+    if [[ ! -f "$exclude_list" ]]; then
+        echo "Error: File not found at $exclude_list"
+        return 1
+    fi
+
+    # Read the file and process each line
+    while IFS= read -r line; do
+        # Skip empty lines or comments
+        if [[ -z "$line" || "$line" == \#* ]]; then
+            continue
+        fi
+
+        # Identify the type of package and uninstall accordingly
+        if [[ "$line" =~ ^brew\ \"(.+)\" ]]; then
+            package="${match[1]}"
+            echo "Uninstalling brew package: $package"
+            brew uninstall --force "$package" || echo "Failed to uninstall $package"
+        elif [[ "$line" =~ ^cask\ \"(.+)\" ]]; then
+            package="${match[1]}"
+            echo "Uninstalling cask package: $package"
+            brew uninstall --cask --force "$package" || echo "Failed to uninstall $package"
+        elif [[ "$line" =~ ^mas\ \"(.+)\",\ id:\ ([0-9]+) ]]; then
+            app="${match[1]}"
+            id="${match[2]}"
+            echo "Uninstalling MAS app: $app (id: $id)"
+            sudo mas uninstall "$id" || echo "Failed to uninstall $app"
+        else
+            echo "Unrecognized format: $line"
+        fi
+    done < "$exclude_list"
+
+    echo "Excluded packages uninstalled."
+}
+
+open_nvim_packer() {
+	cd
+    cd .config
+    cd nvim
+    cd lua
+    cd leviouwendijk
+    nvim packer.lua
+}
+
+nvim_plugin_config() {
+    cd
+    cd .config
+    cd nvim
+    cd after 
+    cd plugin
+    nvim_explore
+}
+
+open_nvim_remaps() {
+	cd
+    cd .config
+    cd nvim
+    cd lua
+    cd leviouwendijk
+    nvim remap.lua
+}
+
+configure_latex_pdf_templates() {
+    cd 
+    cd .config
+    cd nvim
+    cd after
+    cd plugin
+    cd pdf
+    cd latex
+    cd template
+    nvim_explore
+}
+
+go_to_work() {
+	cd
+    cd ~/myworkdir
+	nvim_explore
+}
+
+let_me_write() {
+	cd
+    cd ~/myworkdir/writing
+	nvim_explore
+}
+
+take_a_note () {
+	cd
+    cd ~/myworkdir/writing/notes
+	nvim_explore
+}
+
+let_me_code() {
+	cd
+    cd ~/myworkdir/programming
+	nvim_explore
+}
+
+go_to_the_containers() {
+    cd
+    cd ~/Library/Containers
+    nvim_explore
+}
+
+handle_the_personal() {
+    cd 
+    cd myworkdir/personal
+    nvim_explore
+}
+
+visit_swift_projects() {
+	cd    
+	cd Documents
+    cd Swift\ \Projects
+    nvim_explore
+}
+
+visit_python_projects() {
+	cd    
+	cd Documents
+    cd Python\ \Apps
+    nvim_explore
+}
+
+visit_website_projects() {
+	cd    
+	cd Documents
+    cd Website\ \Projects
+    nvim_explore
+}
+
+leviouwendijk_application_support () {
+    cd 
+    cd library
+    cd application\ support
+    nvim_explore
+}
+
+function iTerm2Run() {
+    if pgrep -x "iTerm" >/dev/null; then
+        osascript -e 'tell application "iTerm" to activate' -e 'tell application "System Events" to keystroke "n" using {command down}'
+    else
+        open -a "iTerm"
+    fi
+}
+
+function systemDocuments() {
+    cd
+    cd Documents
+    nvim_explore
+}
+
+iCloudDriveRoot() {
+    short "multi_cd ~/Library/Mobile\\ Documents"
+}
+
+# previously: iCloudDocs
+icloud() {
+    short "multi_cd ~/Library/Mobile\\ Documents/com~apple~CloudDocs" vimex
+}
+
+iCloudLibrary() {
+    short "multi_cd ~/Library/Mobile\\ Documents/com~apple~CloudDocs/Library" vimex
+}
+
+papers() {
+    short "multi_cd ~/Library/Mobile\\ Documents/com~apple~CloudDocs/Library Papers" vimex
+}
+
+iCloudHondenmeesters() {
+    short "multi_cd ~/Library/Mobile\\ Documents/com~apple~CloudDocs/Shared\\ Files/Hondenmeesters" vimex
+}
+
+iCloudNumbers() {
+    short "multi_cd ~/Library/Mobile\\ Documents/com~apple~Numbers/Documents" vimex
+}
+
+iNumbers() {
+    short "multi_cd ~/Library/Mobile\\ Documents/com~apple~Numbers/Documents" vimex
+}
+
+# note: iCloud tends to separate app folders (like Numbers)
+# into their own directory within the iCloud root ('Mobile Documents')
+# thus: to set up more specific functions, use the iCloud root 
+# to identify the directory of the app you wish to create a shortcut to.
+# allias: icloudroot is for this purpose.
+
+function seeVimConfig() {
+    echo "=== VIM Configging ==="
+    echo "----------------------------------------------"
+    echo "vimconfig      : Launches Neovim with configuration"
+    echo "setvim, vimset, getvim   : Aliases for vimconfig"
+    echo "remaps    : Opens Neovim for remaps configuration"
+    echo "plugins   : Opens Neovim for plugin configuration"
+    echo ""
+    echo ""
+    echo ""
+    echo ""
+}
+
+function seeShellSettings() {
+    echo "=== Shell Settings ==="
+    echo "----------------------------------------------"
+    echo "myshell, nanome  : Opens .zshrc in Nano editor"
+    echo "vimme   : Opens .zshrc in Neovim"
+    echo "vim     : Shortcut to launch Neovim"
+    echo ""
+    echo ""
+    echo ""
+    echo ""
+}
+
+function seeDirectories() {
+echo "=== Directory Aliases ==="
+    echo "----------------------------------------------"
+    echo "vimdir     : Alias for nvim_explore"
+    echo "work, govim  : Opens Neovim in work directory"
+    echo "docs  : Opens general documents folder"
+    echo "write  : Opens Neovim for writing"
+    echo "note   : Opens Neovim for taking notes"
+    echo "code    : Opens Neovim for coding"
+    echo "findswift  : Opens Neovim in Swift Projects directory"
+    echo "findpy  : Opens Neovim in Python Projects directory"
+    echo "findwebs  : Opens Neovim in Python Projects directory"
+    echo ""
+    echo ""
+    echo ""
+    echo ""
+}
+
+function seeShortcutsList() {
+    echo "('see')"
+}
+
+function seeOptions() {
+    echo "----------------------------------------------"
+    echo "seedirs     : See directories to visit quickly"
+    echo "seevims   : See Neovim setup shortcuts"
+    echo "seesett  : See .zshrc shell settings"
+    echo ""
+    echo ""
+    echo ""
+    echo ""
+}
+
+function git_branch() {
+    git branch 2>/dev/null | grep \* | sed "s/* //"
+}
+
+# Define PS1 settings
+PS1_default='%~ %(!.#.$) '                         # Current default
+PS1_red_cursor='%F{red}❯%f %~ %(!.#.$) '           # Red ❯ at the beginning
+PS1_red_cursor_ii='%F{red}>%f %~ %(!.#.$) '        # Red ❯ at the beginning
+PS1_red_cursor_git='%F{red}❯%f %~ $(git_branch) %(!.#.$) ' # Doesn't quite work yet
+
+RPROMPT_default='%F{yellow}[%D{%H:%M:%S}]%f'       # Right prompt with current time
+
+# Function to switch to the red cursor prompt
+function useRedCursorPrompt() {
+    PS1=$PS1_red_cursor
+    export PS1
+}
+
+# Function to switch back to the default prompt
+function useDefaultPrompt() {
+    PS1=$PS1_default
+    export PS1
+}
+
+# Function to dynamically set terminal title
+function set_title() {
+    echo -ne "\033]0;${1}\007"
+}
+
+# Set the terminal title dynamically to show the current directory
+PROMPT_COMMAND='set_title "Dir: $(pwd)"'
+
+# Function to customize the prompt based on the user
+function customizePromptByUser() {
+    local current_user=$(whoami)
+    if [[ $current_user == "leviouwendijk" ]]; then
+        PS1=$PS1_red_cursor_ii  # Default red cursor prompt for Levi
+    else
+        PS1="%F{cyan}($current_user)%f %~ %(!.#.$) "  # Distinguishable cyan prompt with username
+    fi
+    RPROMPT=$RPROMPT_default  # Set the right prompt
+    export PS1 RPROMPT
+}
+
+# Startup actions
+function startUp() {
+    customizePromptByUser
+    # clear
+    touch ~/.hushlogin
+#    seeShortcutsList
+#    echo ""
+}
+
+# Call startup function
+startUp
+# non functional
+restart_shell() {
+	exec "$SHELL"
+}
+
+# function log_command_to_cll() {
+#     # Get the last command
+#     local last_command=$(fc -ln -1)
+
+#     # Skip logging for certain commands
+#     local skip_commands=("cd" "ls" "cll" "exit" "vim" "nvim" "vimit")
+#     for cmd in "${skip_commands[@]}"; do
+#         if [[ "$last_command" == "$cmd"* ]]; then
+#             return
+#         fi
+#     done
+
+#     # Capture stdout and stderr for non-interactive commands
+#     local output
+#     if [[ ! -t 1 ]]; then
+#         # Command is non-interactive with a standard output
+#         output=$(eval "$last_command" 2>&1)
+#     else
+#         output=""
+#     fi
+
+#     # Log the command and its output
+#     cll log "$last_command" "$output"
+# }
+
+# # Hook to run the function after every command
+# precmd() {
+#     # log_command_to_cll
+# }
+
+update_swift_paths() {
+    MODULES_DIR="$HOME/sbm-bin/modules"
+
+    # Ensure the modules directory exists
+    [ -d "$MODULES_DIR" ] || return
+
+    # Initialize an empty paths variable
+    NEW_PATHS=""
+
+    # Loop through each subdirectory and add to SWIFT_INCLUDE_PATHS
+    for dir in "$MODULES_DIR"/*/; do
+        [ -d "$dir" ] || continue  # Skip if not a directory
+        dir=${dir%/}  # Remove trailing slash
+        NEW_PATHS="$dir:$NEW_PATHS"
+    done
+
+    # Export updated SWIFT_INCLUDE_PATHS
+    export SWIFT_INCLUDE_PATHS="$NEW_PATHS$SWIFT_INCLUDE_PATHS"
+    export SWIFT_LIBRARY_PATHS="$NEW_PATHS$SWIFT_LIBRARY_PATHS"
+    export LIBRARY_PATH="$NEW_PATHS$LIBRARY_PATH"
+    export DYLD_LIBRARY_PATH="$NEW_PATHS$DYLD_LIBRARY_PATH"
+    # echo "Updated SWIFT_INCLUDE_PATHS: $SWIFT_INCLUDE_PATHS"
+}
