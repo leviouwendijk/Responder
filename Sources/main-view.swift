@@ -24,6 +24,7 @@ enum MailerCategory: String, RawRepresentable, CaseIterable {
     case affiliate // enum??
     // case onboarding // pre-training
     case service // follow
+    case invoice
     case resolution
     case custom
 }
@@ -43,6 +44,7 @@ enum MailerFile: String, RawRepresentable, CaseIterable {
     case confirmation
     case issue 
     case follow
+    case expired 
     // case preTraining
     case onboarding
     case review
@@ -171,6 +173,8 @@ struct Responder: View {
     @State private var localLocation = "Alkmaar"
     @State private var local = false
 
+    @State private var invoiceId = ""
+
     private let mailerCategories = MailerCategory.allCases
     private let mailerFiles = MailerFile.allCases
 
@@ -183,6 +187,7 @@ struct Responder: View {
         .affiliate: [.food],  // No valid files for affiliate (empty array)
         // .onboarding: [.preTraining], 
         .service: [.follow, .onboarding], 
+        .invoice: [.issue, .expired],
         .resolution: [.review],
         .custom: [.template, .message],
         .none: MailerFile.allCases // All options available when no category is selected
@@ -294,7 +299,14 @@ struct Responder: View {
     }
 
     var mailerCommand: String {
-        if isCustomCategorySelected {
+        if selectedCategory == .invoice {
+            var cmd = "mailer invoice \(invoiceId) --responder"
+
+            if selectedFile == .expired {
+                cmd.append(" --expired")
+            }
+            return cmd
+        } else if isCustomCategorySelected {
             if selectedFile == .template {
                 return "mailer template-api \(fetchableCategory) \(fetchableFile)"
             } else {
@@ -505,9 +517,8 @@ struct Responder: View {
             VStack {
 
                 VStack {
-                    if !(isCustomCategorySelected && selectedFile == .template) {
+                    if !( (isCustomCategorySelected && selectedFile == .template) || selectedCategory == .invoice) {
                         HStack {
-
                             StandardButton(
                                 type: .load, 
                                 title: "Load contacts"
@@ -540,7 +551,7 @@ struct Responder: View {
                 Divider()
 
                 VStack(alignment: .leading) {
-                    if !(isCustomCategorySelected && selectedFile == .template) {
+                    if !( (isCustomCategorySelected && selectedFile == .template) || selectedCategory == .invoice) {
                         // Contact Search Bar
                         TextField("Search Contacts", text: $searchQuery)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -610,6 +621,9 @@ struct Responder: View {
                             TextField("File", text: $fetchableFile)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                         }
+                    } else if selectedCategory == .invoice {
+                        TextField("invoice id (integer)", text: $invoiceId)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
                     } else {
                         TextField("Client (variable: \"{{name}}\"", text: $client)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -675,17 +689,17 @@ struct Responder: View {
                                 //     }
                                 // }
 
-                                StandardButton(
-                                    type: .load, 
-                                    title: "Memo", 
-                                    subtitle: "sets memo emails"
-                                ) {
-                                    email = "casper@hondenmeesters.nl, shusha@hondenmeesters.nl, levi@hondenmeesters.nl"
+                                // StandardButton(
+                                //     type: .load, 
+                                //     title: "Memo", 
+                                //     subtitle: "sets memo emails"
+                                // ) {
+                                //     email = "casper@hondenmeesters.nl, shusha@hondenmeesters.nl, levi@hondenmeesters.nl"
 
-                                    if fetchedHtml.isEmpty {
-                                        fetchedHtml = htmlDoc
-                                    }
-                                }
+                                //     if fetchedHtml.isEmpty {
+                                //         fetchedHtml = htmlDoc
+                                //     }
+                                // }
 
                                 // .padding()
 
@@ -922,6 +936,7 @@ struct Responder: View {
         if includeQuoteInCustomMessage {
             includeQuoteInCustomMessage = false
         }
+        invoiceId = ""
     }
     
     private func sendMailerEmail() {
@@ -930,18 +945,23 @@ struct Responder: View {
         withAnimation { isSendingEmail = true }
 
         var arguments = ""
-        if selectedCategory == .custom {
+
+        if selectedCategory == .invoice {
+            arguments = "invoice \(invoiceId) --responder"
+
+            if selectedFile == .expired {
+                arguments.append(" --expired")
+            }
+        } else if selectedCategory == .custom {
             if selectedFile == .template {
                 arguments = "template-api \(fetchableCategory) \(fetchableFile)"
             } else {
-                var argumentString = ""
-                argumentString = "custom-message --email \"\(finalEmail)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
+                arguments = "custom-message --email \"\(finalEmail)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
                 
                 if includeQuoteInCustomMessage {
-                    argumentString.append(" --quote")
+                    arguments.append(" --quote")
                 }
 
-                arguments = argumentString
                 // arguments = "custom-message --email \"\(finalEmail)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
             }
         } else {
