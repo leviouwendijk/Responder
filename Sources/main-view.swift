@@ -147,7 +147,7 @@ struct TemplateFetchResponse: Decodable {
     let html: String
 }
 
-struct ResponderView: View {
+struct Responder: View {
     @State private var client = ""
     @State private var email = ""
 
@@ -348,12 +348,13 @@ struct ResponderView: View {
     @State private var showSuccessBanner = false
     @State private var successBannerMessage = ""
 
-    @State private var messageMakerTemplate = ""
-    @State private var msgMessage = ""
+    // @State private var messageMakerTemplate = ""
+    // @State private var msgMessage = ""
 
     @State private var isSendingEmail = false
 
-    @State private var mailerOutput = ""
+    // @State private var mailerOutput = ""
+    @EnvironmentObject var vm: MailerViewModel
 
     @State private var bannerColor: Color = .gray
     @State private var httpStatus: Int?
@@ -536,6 +537,8 @@ struct ResponderView: View {
                 }
                 .frame(maxWidth: 350)
 
+                Divider()
+
                 VStack(alignment: .leading) {
                     if !(isCustomCategorySelected && selectedFile == .template) {
                         // Contact Search Bar
@@ -704,72 +707,25 @@ struct ResponderView: View {
                 }
                 .padding()
 
-                VStack {
-                    // Button(action: {
-                    //     NSPasteboard.general.clearContents()
-                    //     NSPasteboard.general.setString(formattedOutput, forType: .string)
-                    // }) {
-                    //     Text(formattedOutput)
-                    //         .bold()
-                    //         .padding()
-                    //         .background(Color.gray.opacity(0.2))
-                    //         .cornerRadius(5)
-                    // }
-                    // .buttonStyle(PlainButtonStyle()) 
-
-                    Button(action: {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(mailerCommand, forType: .string)
-                    }) {
-                        Text(mailerCommand)
-                            .bold()
-                            .padding()
-                            .background(Color.gray.opacity(0.2))
-                            .cornerRadius(5)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
+                // VStack {
+                //     Button(action: {
+                //         NSPasteboard.general.clearContents()
+                //         NSPasteboard.general.setString(mailerCommand, forType: .string)
+                //     }) {
+                //         Text(mailerCommand)
+                //             .bold()
+                //             .padding()
+                //             .background(Color.gray.opacity(0.2))
+                //             .cornerRadius(5)
+                //     }
+                //     .buttonStyle(PlainButtonStyle())
+                // }
             }
             .frame(width: 400)
 
             Divider()
 
             VStack {
-                VStack {
-                    TextField("`sr`, `na`, `no-answer`", text: $messageMakerTemplate)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .onSubmit {
-                        makeQuickMessage()
-                    }
-
-                    HStack {
-                        Button(action: makeQuickMessage) {
-                            Label("make msg", systemImage: "apple.terminal.fill")
-                        }
-                        .buttonStyle(.borderedProminent)
-
-                        Button(action: clearMsgMessage) {
-                            Label("clear message", systemImage: "apple.terminal.fill")
-                        }
-                        .buttonStyle(.bordered)
-                    }
-
-                    Button(action: {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(msgMessage, forType: .string)
-                    }) {
-                        Text(msgMessage)
-                            .bold()
-                            .padding()
-                            .background(Color.gray.opacity(0.2))
-                            .cornerRadius(5)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-
-                }
-
-                Spacer()
-
                 if isCustomCategorySelected {
                     VStack(alignment: .leading) {
 
@@ -786,10 +742,14 @@ struct ResponderView: View {
 
                         Text("Template HTML").bold()
 
-                        TextEditor(text: $fetchedHtml)
-                        .font(.system(.body, design: .monospaced))
-                        .border(Color.gray)
-                        .frame(minHeight: 300)
+
+                        CodeEditor(text: $fetchedHtml)
+
+                        // TextEditor(text: $fetchedHtml)
+                        // .font(.system(.body, design: .monospaced))
+                        // .border(Color.gray)
+                        // .frame(minHeight: 300)
+
                         // .frame(minWidth: 300)
 
                         if (anyInvalidConditionsCheck && finalHtmlContainsRawVariables) {
@@ -904,149 +864,6 @@ struct ResponderView: View {
             }
             .frame(width: 700)
             
-            // new stdout pane:
-            Divider()
-
-            VStack(alignment: .leading) {
-                // Toggle("Show Central Error Pane", isOn: $showErrorPane)
-                StandardToggle(
-                    style: .switch,
-                    isOn: $showErrorPane,
-                    title: "Show Error Pane",
-                    subtitle: nil,
-                    width: 150
-                )
-                if showErrorPane {
-                    Text("Central Error Pane").bold()
-                    ScrollView {
-                        if (disabledFileSelected) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.headline)
-                                    .accessibilityHidden(true)
-
-                                Text("Select a template for this category")
-                                .font(.subheadline)
-                                .bold()
-                            }
-                            .foregroundColor(.black)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 16)
-                            .background(Color.yellow)
-                            .cornerRadius(8)
-                            .padding(.horizontal)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                            .animation(.easeInOut, value: (disabledFileSelected))
-                        }
-
-                        if (anyInvalidConditionsCheck && emptySubjectWarning) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.headline)
-                                    .accessibilityHidden(true)
-
-                                Text("emptySubjectWarning: fill out a subject")
-                                .font(.subheadline)
-                                .bold()
-                            }
-                            .foregroundColor(.black)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 16)
-                            .background(Color.yellow)
-                            .cornerRadius(8)
-                            .padding(.horizontal)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && emptySubjectWarning))
-                        }
-
-                        if (anyInvalidConditionsCheck && emptyEmailWarning) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.headline)
-                                    .accessibilityHidden(true)
-
-                                Text("emptyEmailWarning: fill out an email or multiple")
-                                .font(.subheadline)
-                                .bold()
-                            }
-                            .foregroundColor(.black)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 16)
-                            .background(Color.yellow)
-                            .cornerRadius(8)
-                            .padding(.horizontal)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && emptyEmailWarning))
-                        }
-
-                        if (anyInvalidConditionsCheck && contactExtractionError) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.headline)
-                                    .accessibilityHidden(true)
-
-                                Text("ContactExtractionError: client or dog name is invalid")
-                                .font(.subheadline)
-                                .bold()
-                            }
-                            .foregroundColor(.white)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 16)
-                            .background(Color.red)
-                            .cornerRadius(8)
-                            .padding(.horizontal)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && contactExtractionError))
-                        }
-
-                        if (anyInvalidConditionsCheck && finalHtmlContainsRawVariables) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.headline)
-                                    .accessibilityHidden(true)
-
-                                Text("Please replace all raw template variables before sending.")
-                                    .font(.subheadline)
-                                    .bold()
-                            }
-                            .foregroundColor(.white)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 16)
-                            .background(Color.red)
-                            .cornerRadius(8)
-                            .padding(.horizontal)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && finalHtmlContainsRawVariables))
-                        }
-                    }
-                    .background(Color.black.opacity(0.05))
-                    .cornerRadius(6)
-                    .frame(maxHeight: 300)
-                }
-
-                Text("Mailer Log").bold()
-                    ScrollView {
-                        Text(mailerOutput)
-                            .font(.system(.body, design: .monospaced))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(4)
-                    }
-                .background(Color.black.opacity(0.05))
-                .cornerRadius(6)
-
-                HStack {
-                    Button(action: copyMailerOutput) {
-                        Label("copy stdout", systemImage: "document.on.document.fill")
-                    }
-                    // .buttonStyle(.plain)
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.top, 10)
-            }
-            .frame(minWidth: 50)
-            // end of new stdout pane
-
-            // .frame(width: 400)
         }
         .padding()
         .onAppear {
@@ -1058,6 +875,9 @@ struct ResponderView: View {
                 message: Text(alertMessage),
                 dismissButton: .default(Text("OK"))
             )
+        }
+        .onChange(of: mailerCommand) { oldValue, newValue in
+            vm.sharedMailerCommandCopy = newValue
         }
     }
 
@@ -1104,12 +924,8 @@ struct ResponderView: View {
         }
     }
     
-    private func copyMailerOutput() {
-        copyToClipboard(mailerOutput)
-    }
-
     private func sendMailerEmail() {
-        mailerOutput = ""
+        vm.mailerOutput = ""
 
         withAnimation { isSendingEmail = true }
 
@@ -1158,7 +974,7 @@ struct ResponderView: View {
                     let data = h.availableData
                     guard !data.isEmpty, let str = String(data: data, encoding: .utf8) else { return }
                     DispatchQueue.main.async {
-                        mailerOutput += str
+                        vm.mailerOutput += str
                     }
                 }
             }
@@ -1169,7 +985,7 @@ struct ResponderView: View {
                 try proc.run()
             } catch {
                 DispatchQueue.main.async {
-                    mailerOutput += "launch failed: \(error.localizedDescription)\n"
+                    vm.mailerOutput += "launch failed: \(error.localizedDescription)\n"
                 }
             }
 
@@ -1187,7 +1003,7 @@ struct ResponderView: View {
 
                 // color mechanism:
                 // 1) try grab the HTTP status line
-                if let codeStr = mailerOutput.firstCapturedGroup(
+                if let codeStr = vm.mailerOutput.firstCapturedGroup(
                      pattern: #"HTTP Status Code:\s*(\d{3})"#,
                      options: .caseInsensitive
                    ),
@@ -1197,12 +1013,12 @@ struct ResponderView: View {
                   bannerColor = (200..<300).contains(code) ? .green : .red
                 }
                 // 2) grab the *last* {...} JSON
-                if let jsonRange = mailerOutput.range(
+                if let jsonRange = vm.mailerOutput.range(
                      of: #"\{[\s\S]*\}"#,
                      options: [.regularExpression, .backwards]
                    )
                 {
-                  let blob = String(mailerOutput[jsonRange])
+                  let blob = String(vm.mailerOutput[jsonRange])
                   if let d    = blob.data(using: .utf8),
                      let resp = try? JSONDecoder().decode(APIError.self, from: d)
                   {
@@ -1219,12 +1035,12 @@ struct ResponderView: View {
 
                 // also parse / extract html body if it was a template call:
                 if selectedCategory == .custom && selectedFile == .template {
-                    if let jsonRange = mailerOutput.range(
+                    if let jsonRange = vm.mailerOutput.range(
                         of: #"\{[\s\S]*\}"#, 
                         options: [.regularExpression, .backwards]
                         )
                     {
-                    let blob = String(mailerOutput[jsonRange])
+                    let blob = String(vm.mailerOutput[jsonRange])
                     if let data = blob.data(using: .utf8),
                         let resp = try? JSONDecoder().decode(TemplateFetchResponse.self, from: data),
                         resp.success
@@ -1244,57 +1060,6 @@ struct ResponderView: View {
         }
     }
 
-    // private func sendMailerEmail() {
-    //     withAnimation {
-    //         isSendingEmail = true
-    //     }
-        
-    //     let data = MailerArguments(
-    //         client: client,
-    //         email: email,
-    //         dog: dog,
-    //         category: selectedCategory,
-    //         file: selectedFile,
-    //         availabilityJSON: availabilityJSON,
-    //         needsAvailability: needsAvailability
-    //     )
-    //     let arguments = data.string(false)
-    //     // Execute on a background thread to avoid blocking the UI
-    //     DispatchQueue.global(qos: .userInitiated).async {
-    //         do {
-    //             try executeMailer(arguments)
-    //             // Prepare success alert on the main thread
-    //             DispatchQueue.main.async {
-    //                 successBannerMessage = "mailer process was executed successfully."
-    //                 showSuccessBanner = true
-
-    //                 clearContact()
-
-    //                 withAnimation {
-    //                     isSendingEmail = false
-    //                 }
-
-    //                 // Auto-dismiss after 3 seconds
-    //                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-    //                     withAnimation {
-    //                         showSuccessBanner = false
-    //                     }
-    //                 }
-    //             }
-    //         } catch {
-    //             // Prepare failure alert on the main thread
-    //             DispatchQueue.main.async {
-    //                 alertTitle = "Error"
-    //                 alertMessage = "There was an error in executing the mailer process:\n\(error.localizedDescription) \(arguments)"
-    //                 showAlert = true
-    //                 withAnimation {
-    //                     isSendingEmail = false
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
     private func clearContact() {
         client = ""
         email = ""
@@ -1304,41 +1069,6 @@ struct ResponderView: View {
         street = ""
         number = ""
         selectedContact = nil
-    }
-
-    private func makeQuickMessage() {
-        let arguments = "\"\(client)\" \"\(dog)\" \(messageMakerTemplate)"
-        // Execute on a background thread to avoid blocking the UI
-        DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                let message = try executeMessageMaker(arguments)
-                // Prepare success alert on the main thread
-                DispatchQueue.main.async {
-                    successBannerMessage = "msg executed successfully"
-                    showSuccessBanner = true
-
-                    msgMessage = message
-
-                    // Auto-dismiss after 3 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                        withAnimation {
-                            showSuccessBanner = false
-                        }
-                    }
-                }
-            } catch {
-                // Prepare failure alert on the main thread
-                DispatchQueue.main.async {
-                    alertTitle = "Error"
-                    alertMessage = "Problem with execution of msg:\n\(error.localizedDescription) \(arguments)"
-                    showAlert = true
-                }
-            }
-        }
-    }
-
-    private func clearMsgMessage() {
-        msgMessage = ""
     }
 }
 
@@ -1458,39 +1188,6 @@ func executeMailer(_ arguments: String) throws {
     }
 }
 
-func executeMessageMaker(_ arguments: String) throws -> String {
-    do {
-        let home = Home.string()
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/zsh") // Use Zsh directly
-        process.arguments = ["-c", "source ~/dotfiles/.vars.zsh && \(home)/sbm-bin/msg \(arguments)"]
-        
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
-        process.standardOutput = outputPipe
-        process.standardError = errorPipe
-
-        try process.run()
-        process.waitUntilExit()
-
-        let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-        let outputString = String(data: outputData, encoding: .utf8) ?? ""
-        let errorString = String(data: errorData, encoding: .utf8) ?? ""
-
-        if process.terminationStatus == 0 {
-            print("msg executed successfully:\n\(outputString)")
-            return outputString
-        } else {
-            print("Error running msg:\n\(errorString)")
-            throw NSError(domain: "msg", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: errorString])
-        }
-    } catch {
-        print("Error running commands: \(error)")
-        throw error
-    }
-}
-
 
 // Replace '|' with space, split by whitespace, remove empty parts, and join back
 extension String {
@@ -1510,11 +1207,11 @@ extension String {
     }
 }
 
-struct ContentView: View {
-    var body: some View {
-        ResponderView()
-    }
-}
+// struct ContentView: View {
+//     var body: some View {
+//         ResponderView()
+//     }
+// }
 
 // @main
 // struct ResponderApp: App {
