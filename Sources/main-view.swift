@@ -18,7 +18,7 @@ let htmlDoc = """
 """
 
 enum MailerCategory: String, RawRepresentable, CaseIterable {
-    case none
+    // case none
     case quote // issue, follow
     case lead // confirmation, follow
     case affiliate // enum??
@@ -27,6 +27,7 @@ enum MailerCategory: String, RawRepresentable, CaseIterable {
     case invoice
     case resolution
     case custom
+    case template
 }
 
 extension MailerCategory {
@@ -40,7 +41,7 @@ extension MailerCategory {
 }
 
 enum MailerFile: String, RawRepresentable, CaseIterable {
-    case none
+    // case none
     case confirmation
     case issue 
     case follow
@@ -52,71 +53,7 @@ enum MailerFile: String, RawRepresentable, CaseIterable {
     case food
     case template
     case message
-}
-
-enum Weekday: String, CaseIterable, Identifiable {
-    case mon, tue, wed, thu, fri, sat, sun
-    var id: String { rawValue }
-
-    var abbr: String {
-        switch self {
-            case .mon: return "Ma"
-            case .tue: return "Di"
-            case .wed: return "Wo"
-            case .thu: return "Do"
-            case .fri: return "Vr"
-            case .sat: return "Zat"
-            case .sun: return "Zo"
-        }
-    }
-}
-
-/// Holds one day’s on/off + start/end times
-struct DaySchedule {
-    var enabled: Bool
-    var start:   Date
-    var end:     Date
-
-    init(defaultsFor day: Weekday) {
-        let cal   = Calendar.current
-        let today = Date()
-        // helper to avoid repeating `second: 0`
-        func at(_ hour: Int, _ minute: Int) -> Date {
-            return cal.date(
-              bySettingHour: hour,
-              minute: minute,
-              second: 0,
-              of: today
-            )!
-        }
-
-        switch day {
-        case .mon:
-            enabled = true
-            start   = at(18, 0)
-            end     = at(21, 0)
-        case .tue:
-            enabled = true
-            start   = at(10, 0)
-            end     = at(21, 0)
-        case .wed:
-            enabled = true
-            start   = at(18, 0)
-            end     = at(21, 0)
-        case .thu:
-            enabled = true
-            start   = at(18, 0)
-            end     = at(21, 0)
-        case .fri:
-            enabled = true
-            start   = at(10, 0)
-            end     = at(21, 0)
-        case .sat, .sun:
-            enabled = true
-            start   = at(18, 0)
-            end     = at(21, 0)
-        }
-    }
+    case fetch
 }
 
 extension String {
@@ -133,14 +70,6 @@ extension String {
             m.numberOfRanges >= 2
       else { return nil }
       return ns.substring(with: m.range(at: 1))
-    }
-}
-
-extension String {
-    func htmlClean() -> String {
-        return self
-            .replacingOccurrences(of: "\n", with: "")
-            .replacingOccurrences(of: "\"", with: "\\\"")
     }
 }
 
@@ -178,8 +107,8 @@ struct Responder: View {
     private let mailerCategories = MailerCategory.allCases
     private let mailerFiles = MailerFile.allCases
 
-    @State private var selectedCategory: MailerCategory = .none
-    @State private var selectedFile: MailerFile = .none
+    @State private var selectedCategory: MailerCategory? = nil
+    @State private var selectedFile: MailerFile? = nil
 
     private let validFilesForCategory: [MailerCategory: [MailerFile]] = [
         .quote: [.issue, .follow],  // No confirmation for quotes
@@ -189,52 +118,76 @@ struct Responder: View {
         .service: [.follow, .onboarding], 
         .invoice: [.issue, .expired],
         .resolution: [.review],
-        .custom: [.template, .message],
-        .none: MailerFile.allCases // All options available when no category is selected
+        .custom: [.message],
+        .template: [.fetch]
     ]
 
-    private func isFileDisabled(_ file: MailerFile) -> Bool {
-        guard let allowedFiles = validFilesForCategory[selectedCategory] else {
-            return false
-        }
-        return !allowedFiles.contains(file)
-    }
+    // private func resetFileIfInvalid() {
+    //     guard
+    //       let category = selectedCategory,
+    //       let file     = selectedFile,
+    //       let allowed  = validFilesForCategory[category],
+    //       !allowed.contains(file)
+    //     else { return }
 
-    private func resetFileIfInvalid() {
-        guard let allowedFiles = validFilesForCategory[selectedCategory] else { return }
-        if !allowedFiles.contains(selectedFile) {
-            selectedFile = .none
-        }
-    }
+    //     selectedFile = nil
+    // }
 
     private var availableFiles: [MailerFile] {
-        validFilesForCategory[selectedCategory] ?? []
+        guard let category = selectedCategory else { return [] }
+        return validFilesForCategory[category] ?? []
     }
 
-    @State private var weeklySchedule = Dictionary(
-        uniqueKeysWithValues: Weekday.allCases.map {
-            ($0, DaySchedule(defaultsFor: $0))
-        }
-    )
+    private func isFileDisabled(_ file: MailerFile) -> Bool {
+        guard
+          let category = selectedCategory,
+          let allowed  = validFilesForCategory[category]
+        else { return true }   // disable everything if no category
+        return !allowed.contains(file)
+    }
+
+    private var disabledFileSelected: Bool {
+        selectedFile.map { isFileDisabled($0) } ?? false
+    }
+
+    private var needsAvailability: Bool {
+        guard
+          let category = selectedCategory,
+          let file     = selectedFile
+        else { return false }
+        return category.filesRequiringAvailability.contains(file)
+    }
+
+    // @State private var weeklySchedule = Dictionary(
+    //     uniqueKeysWithValues: MailerAPIWeekday.allCases.map {
+    //         ($0, MailerAPIDaySchedule(defaultsFor: $0))
+    //     }
+    // )
 
     /// Builds a `[String:[String:String]]` from your `weeklySchedule`
-    private var availabilityDict: [String:[String:String]] {
-        var out = [String:[String:String]]()
-        let df: DateFormatter = {
-            let f = DateFormatter(); f.dateFormat = "HH:mm"; return f
-        }()
-        for day in Weekday.allCases {
-            if let sched = weeklySchedule[day], sched.enabled {
-                out[day.rawValue] = [
-                    "start": df.string(from: sched.start),
-                    "end":   df.string(from: sched.end)
-                ]
-            }
-        }
-        return out
+    // private var availabilityDict: [String:[String:String]] {
+    //     var out = [String:[String:String]]()
+    //     let df: DateFormatter = {
+    //         let f = DateFormatter(); f.dateFormat = "HH:mm"; return f
+    //     }()
+    //     for day in MailerAPIWeekday.allCases {
+    //         if let sched = weeklySchedule[day], sched.enabled {
+    //             out[day.rawValue] = [
+    //                 "start": df.string(from: sched.start),
+    //                 "end":   df.string(from: sched.end)
+    //             ]
+    //         }
+    //     }
+    //     return out
+
+    // }
+
+    @StateObject private var weeklyScheduleVm = WeeklyScheduleViewModel()
+
+    private var availabilityDict: [String: [String:String]] {
+        return weeklyScheduleVm.availabilityContent.time_range()
     }
 
-    /// Serializes that to a compact JSON string (or `nil` if empty)
     private var availabilityJSON: String? {
         guard !availabilityDict.isEmpty,
               let data = try? JSONSerialization.data(withJSONObject: availabilityDict),
@@ -243,11 +196,12 @@ struct Responder: View {
         return json
     }
 
-    private var needsAvailability: Bool {
-        selectedCategory.filesRequiringAvailability.contains(selectedFile)
-    }
 
     var isCustomCategorySelected: Bool {
+        return (selectedCategory == .custom)
+    }
+
+    var isTemplateCategorySelected: Bool {
         return (selectedCategory == .custom)
     }
 
@@ -276,13 +230,9 @@ struct Responder: View {
         return email.isEmpty
     }
 
-    private var disabledFileSelected: Bool {
-        return isFileDisabled(selectedFile)
-    }
-
     private var anyInvalidConditionsCheck: Bool {
         // if custom/template, be more tolerant about starting mailer
-        if (isCustomCategorySelected && selectedFile == .template) {
+        if (isTemplateCategorySelected) {
             return false
         // if custom/.., check the html body for raw variables
         } else if (isCustomCategorySelected) {
@@ -298,45 +248,36 @@ struct Responder: View {
         }
     }
 
-    var mailerCommand: String {
-        if selectedCategory == .invoice {
-            var cmd = "mailer invoice \(invoiceId) --responder"
+    // var mailerCommand: String {
+    //     return (try? constructMailerCommand()) ?? ""
+    // }
 
-            if selectedFile == .expired {
-                cmd.append(" --expired")
-            }
-            return cmd
-        } else if isCustomCategorySelected {
-            if selectedFile == .template {
-                return "mailer template-api \(fetchableCategory) \(fetchableFile)"
-            } else {
-                var argumentString = ""
-                argumentString = "mailer custom-message --email \"\(finalEmail)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
-                
-                if includeQuoteInCustomMessage {
-                    argumentString.append(" --quote")
-                }
+    func constructMailerCommand(_ includeBinaryName: Bool = false) throws -> String {
+        let stateVars = StateVariables(
+            invoiceId: invoiceId,
+            fetchableCategory: fetchableCategory,
+            fetchableFile: fetchableFile,
+            finalEmail: finalEmail,
+            finalSubject: finalSubject,
+            finalHtml: finalHtml,
+            includeQuote: includeQuoteInCustomMessage
+        )
 
-                return argumentString
-            }
-        } else {
-            let mailerArgs = MailerArguments(
-                client: client,
-                email: finalEmail,
-                dog: dog,
-                category: selectedCategory,
-                file: selectedFile,
-                // date: cliDate,
-                // time: cliTime,
-                // location: location,
-                // areaCode: areaCode,
-                // street: street,
-                // number: number
-                availabilityJSON: availabilityJSON,
-                needsAvailability: needsAvailability
-            )
-            return mailerArgs.string()
-        }
+        let args = MailerArguments(
+            client: client,
+            email: finalEmail,
+            dog: dog,
+            category: selectedCategory,
+            file: selectedFile,
+            availabilityJSON: availabilityJSON,
+            needsAvailability: needsAvailability,
+            stateVariables: stateVars
+        )
+        return try args.string(includeBinaryName)
+    }
+
+    func updateCommandInViewModel(newValue: String) {
+        vm.sharedMailerCommandCopy = newValue
     }
 
     @State private var searchQuery = ""
@@ -345,11 +286,11 @@ struct Responder: View {
 
     var filteredContacts: [CNContact] {
         if searchQuery.isEmpty { return contacts }
-        let normalizedQuery = searchQuery.normalizedForSearch
+        let normalizedQuery = searchQuery.normalizedForClientDogSearch
         return contacts.filter {
-            $0.givenName.normalizedForSearch.contains(normalizedQuery) ||
-            $0.familyName.normalizedForSearch.contains(normalizedQuery) ||
-            (($0.emailAddresses.first?.value as String?)?.normalizedForSearch.contains(normalizedQuery) ?? false)
+            $0.givenName.normalizedForClientDogSearch.contains(normalizedQuery) ||
+            $0.familyName.normalizedForClientDogSearch.contains(normalizedQuery) ||
+            (($0.emailAddresses.first?.value as String?)?.normalizedForClientDogSearch.contains(normalizedQuery) ?? false)
         }
     }
 
@@ -360,12 +301,8 @@ struct Responder: View {
     @State private var showSuccessBanner = false
     @State private var successBannerMessage = ""
 
-    // @State private var messageMakerTemplate = ""
-    // @State private var msgMessage = ""
-
     @State private var isSendingEmail = false
 
-    // @State private var mailerOutput = ""
     @EnvironmentObject var vm: MailerViewModel
 
     @State private var bannerColor: Color = .gray
@@ -397,10 +334,11 @@ struct Responder: View {
                                         isSelected: selectedCategory == category,
                                         animationDuration: 0.3
                                     ) {
-                                        // withAnimation(.easeInOut(duration: 0.2)) {
-                                          selectedCategory = category
-                                          resetFileIfInvalid()
-                                        // }
+                                        if selectedCategory == category {
+                                            selectedCategory = nil
+                                        } else {
+                                            selectedCategory = category
+                                        }
                                     }
                                     .frame(maxWidth: .infinity)
                                 }
@@ -418,12 +356,14 @@ struct Responder: View {
                             VStack(spacing: 5) {
                                 ForEach(availableFiles, id: \.self) { file in
                                     SelectableRow(
-                                            title: file.rawValue.capitalized,
-                                            isSelected: selectedFile == file
-                                            ) {
-                                        // withAnimation(.easeInOut(duration: 0.2)) {
+                                        title: file.rawValue.capitalized,
+                                        isSelected: selectedFile == file
+                                    ) {
+                                        if selectedFile == file {
+                                            selectedFile = nil
+                                        } else {
                                             selectedFile = file
-                                        // }
+                                        }
                                     }
                                     .frame(maxWidth: .infinity)
                                 }
@@ -471,59 +411,9 @@ struct Responder: View {
                 }
             }
 
-            // }
-
-            // VStack {
-            //     Text("File").bold()
-
-            //     List(mailerFiles, id: \.self) { file in
-            //         Button(action: { 
-            //             if !isFileDisabled(file) { 
-            //                 selectedFile = file 
-            //             }
-            //         }) {
-            //             Text(file.rawValue.capitalized)
-            //                 .frame(maxWidth: .infinity, minHeight: 16)
-            //                 .padding()
-            //                 .background(selectedFile == file ? Color.blue.opacity(0.3) : Color.clear)
-            //                 .clipShape(RoundedRectangle(cornerRadius: 8))
-            //                 .opacity(isFileDisabled(file) ? 0.5 : 1.0) // Reduce opacity if disabled
-            //         }
-            //         .contentShape(Rectangle())
-            //         .disabled(isFileDisabled(file)) // Disable the button when not allowed
-            //     }
-            //     .scrollContentBackground(.hidden)
-
-            //     if (disabledFileSelected) {
-            //         HStack(spacing: 8) {
-            //             Image(systemName: "exclamationmark.triangle.fill")
-            //                 .font(.headline)
-            //                 .accessibilityHidden(true)
-
-            //             Text("Select a template for this category")
-            //             .font(.subheadline)
-            //             .bold()
-            //         }
-            //         .foregroundColor(.black)
-            //         .padding(.vertical, 10)
-            //         .padding(.horizontal, 16)
-            //         .background(Color.yellow)
-            //         .cornerRadius(8)
-            //         .padding(.horizontal)
-            //         .transition(.move(edge: .top).combined(with: .opacity))
-            //         .animation(.easeInOut, value: (disabledFileSelected))
-            //     }
-
-            // }
-            // .frame(width: 140)
-
-
-
-            // Output and format control
             VStack {
-
                 VStack {
-                    if !( (isCustomCategorySelected && selectedFile == .template) || selectedCategory == .invoice) {
+                    if !(selectedCategory == .template || selectedCategory == .invoice) {
                         HStack {
                             StandardButton(
                                 type: .load, 
@@ -557,7 +447,7 @@ struct Responder: View {
                 Divider()
 
                 VStack(alignment: .leading) {
-                    if !( (isCustomCategorySelected && selectedFile == .template) || selectedCategory == .invoice) {
+                    if !(selectedCategory == .template || selectedCategory == .invoice) {
                         // Contact Search Bar
                         TextField("Search Contacts", text: $searchQuery)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -585,30 +475,33 @@ struct Responder: View {
 
                         // Contact List
                         List(filteredContacts, id: \.identifier) { contact in
-                            Button(action: {
-                                clearContact()
+                          Button(action: {
+                            clearContact()
+                            selectedContact = contact
 
-                                selectedContact = contact
+                            let split = splitClientDog(contact.givenName)
+                            client = split.name
+                            dog    = split.dog
+                            email  = contact.emailAddresses.first?.value as String? ?? ""
 
-                                let split = splitClientDog(contact.givenName)
-                                client = split.name
-                                dog = split.dog
-                                email = contact.emailAddresses.first?.value as String? ?? ""
-                                
-                                if let postalAddress = contact.postalAddresses.first?.value {
-                                    location = postalAddress.city
-                                    street = postalAddress.street
-                                    areaCode = postalAddress.postalCode
-                                }
-                            }) {
-                                HStack {
-                                    Text("\(contact.givenName) \(contact.familyName)")
-                                        .font(selectedContact?.identifier == contact.identifier ? .headline : .body)
-                                    Spacer()
-                                    Text(contact.emailAddresses.first?.value as String? ?? "")
-                                        .foregroundColor(.gray)
-                                }
+                            if let addr = contact.postalAddresses.first?.value {
+                              location = addr.city
+                              street   = addr.street
+                              areaCode = addr.postalCode
                             }
+                          }) {
+                            HStack {
+                              Text("\(contact.givenName) \(contact.familyName)")
+                                .font(
+                                  selectedContact?.identifier == contact.identifier
+                                  ? .headline
+                                  : .body
+                                )
+                              Spacer()
+                              Text(contact.emailAddresses.first?.value as String? ?? "")
+                                .foregroundColor(.gray)
+                            }
+                          }
                         }
                         .scrollContentBackground(.hidden) 
                         .frame(height: 200)
@@ -617,7 +510,7 @@ struct Responder: View {
 
                     Text("Mailer Arguments").bold()
                     
-                    if isCustomCategorySelected && selectedFile == .template {
+                    if selectedCategory == .template {
                         HStack {
                             TextField("Category", text: $fetchableCategory)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -672,10 +565,6 @@ struct Responder: View {
                         .textFieldStyle(RoundedBorderTextFieldStyle())
 
                         HStack {
-                            // Button("Clear contact") {
-                            //     clearContact()
-                            // }
-
                             StandardButton(
                                 type: .clear, 
                                 title: "Clear contact", 
@@ -688,29 +577,6 @@ struct Responder: View {
                             Spacer()
 
                             if selectedFile == .message {
-                                // Button("Memo") {
-                                //     email = "casper@hondenmeesters.nl, shusha@hondenmeesters.nl, levi@hondenmeesters.nl"
-                                //     if fetchedHtml.isEmpty {
-                                //         fetchedHtml = htmlDoc
-                                //     }
-                                // }
-
-                                // StandardButton(
-                                //     type: .load, 
-                                //     title: "Memo", 
-                                //     subtitle: "sets memo emails"
-                                // ) {
-                                //     email = "casper@hondenmeesters.nl, shusha@hondenmeesters.nl, levi@hondenmeesters.nl"
-
-                                //     if fetchedHtml.isEmpty {
-                                //         fetchedHtml = htmlDoc
-                                //     }
-                                // }
-
-                                // .padding()
-
-                                // Toggle("Include quote", isOn: $includeQuoteInCustomMessage)
-
                                 StandardToggle(
                                     style: .switch,
                                     isOn: $includeQuoteInCustomMessage,
@@ -718,7 +584,6 @@ struct Responder: View {
                                     subtitle: nil,
                                     width: 150
                                 )
-                                // .padding()
                             }
                         }
                         .frame(maxWidth: 350)
@@ -726,20 +591,6 @@ struct Responder: View {
                     }
                 }
                 .padding()
-
-                // VStack {
-                //     Button(action: {
-                //         NSPasteboard.general.clearContents()
-                //         NSPasteboard.general.setString(mailerCommand, forType: .string)
-                //     }) {
-                //         Text(mailerCommand)
-                //             .bold()
-                //             .padding()
-                //             .background(Color.gray.opacity(0.2))
-                //             .cornerRadius(5)
-                //     }
-                //     .buttonStyle(PlainButtonStyle())
-                // }
             }
             .frame(width: 400)
 
@@ -787,11 +638,6 @@ struct Responder: View {
                             fetchedHtml = ""
                         }
 
-                        // .disabled(true) // testing the disabled view of std buttons
-
-                        // Button("clear html") {
-                        //     fetchedHtml = ""
-                        // }
                         .padding()
                     }
                     .padding()
@@ -799,33 +645,7 @@ struct Responder: View {
 
                     if needsAvailability {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Week-/time availability").bold()
-
-                            ForEach(Weekday.allCases) { day in
-                                HStack(spacing: 12) {
-                                    Toggle(day.abbr, isOn: Binding(
-                                      get: { weeklySchedule[day]!.enabled },
-                                      set: { weeklySchedule[day]!.enabled = $0 }
-                                    ))
-                                    .toggleStyle(.switch)
-
-                                    if weeklySchedule[day]!.enabled {
-                                        DatePicker("", selection: Binding(
-                                            get: { weeklySchedule[day]!.start },
-                                            set: { weeklySchedule[day]!.start = $0 }
-                                        ), displayedComponents: .hourAndMinute)
-                                        .labelsHidden()
-                                        .datePickerStyle(.compact)
-
-                                        DatePicker("", selection: Binding(
-                                            get: { weeklySchedule[day]!.end },
-                                            set: { weeklySchedule[day]!.end = $0 }
-                                        ), displayedComponents: .hourAndMinute)
-                                        .labelsHidden()
-                                        .datePickerStyle(.compact)
-                                    }
-                                }
-                            }
+                            WeeklyScheduleView(viewModel: weeklyScheduleVm)
                         }
                         .padding(.vertical, 8)
                     }
@@ -833,7 +653,6 @@ struct Responder: View {
 
                 Spacer()
 
-                // **Queue Management Buttons**
                 if showSuccessBanner {
                     VStack {
                         Spacer()
@@ -872,20 +691,24 @@ struct Responder: View {
                     }
 
                     HStack {
-                        // Button(action: sendMailerEmail) {
-                        //     Label("Start mailer process", systemImage: "paperplane.fill")
-                        // }
-                        // .buttonStyle(.borderedProminent)
-                        // .disabled(isSendingEmail || anyInvalidConditionsCheck || disabledFileSelected)
-
                         StandardButton(
                             type: .execute, 
                             title: "Run mailer", 
                             subtitle: "Starts mailer background process"
                         ) {
-                            sendMailerEmail()
+                            do {
+                                try sendMailerEmail()
+                            } catch {
+                                print(error)
+                            }
                         }
-                        .disabled(isSendingEmail || anyInvalidConditionsCheck || disabledFileSelected)
+                        .disabled(
+                            isSendingEmail || 
+                            anyInvalidConditionsCheck || 
+                            disabledFileSelected ||
+                            selectedCategory == nil ||
+                            selectedFile == nil
+                        )
 
                     }
                     .padding(.top, 10)
@@ -905,9 +728,10 @@ struct Responder: View {
                 dismissButton: .default(Text("OK"))
             )
         }
-        .onChange(of: mailerCommand) { oldValue, newValue in
-            vm.sharedMailerCommandCopy = newValue
-        }
+
+        // .onChange(of: mailerCommand) { oldValue, newValue in
+        //     vm.sharedMailerCommandCopy = newValue
+        // }
     }
 
     func replaceTemplateVariables(_ string: String) -> String {
@@ -954,44 +778,15 @@ struct Responder: View {
         invoiceId = ""
     }
     
-    private func sendMailerEmail() {
+    private func sendMailerEmail() throws {
         vm.mailerOutput = ""
 
         withAnimation { isSendingEmail = true }
 
-        var arguments = ""
+        let arguments = try constructMailerCommand(false)
 
-        if selectedCategory == .invoice {
-            arguments = "invoice \(invoiceId) --responder"
-
-            if selectedFile == .expired {
-                arguments.append(" --expired")
-            }
-        } else if selectedCategory == .custom {
-            if selectedFile == .template {
-                arguments = "template-api \(fetchableCategory) \(fetchableFile)"
-            } else {
-                arguments = "custom-message --email \"\(finalEmail)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
-                
-                if includeQuoteInCustomMessage {
-                    arguments.append(" --quote")
-                }
-
-                // arguments = "custom-message --email \"\(finalEmail)\" --subject \"\(finalSubject)\" --body \"\(finalHtml)\""
-            }
-        } else {
-            let data = MailerArguments(
-                client: client,
-                email: finalEmail,
-                dog: dog,
-                category: selectedCategory,
-                file: selectedFile,
-                availabilityJSON: availabilityJSON,
-                needsAvailability: needsAvailability
-            )
-            arguments = data.string(false)
-        }
-        // let arguments = data.string(false)
+        let argsWithBinary = try constructMailerCommand(true)
+        updateCommandInViewModel(newValue: argsWithBinary)
 
         DispatchQueue.global(qos: .userInitiated).async {
             let home = Home.string()
@@ -1069,7 +864,7 @@ struct Responder: View {
                 // end of color mechanism
 
                 // also parse / extract html body if it was a template call:
-                if selectedCategory == .custom && selectedFile == .template {
+                if selectedCategory == .template {
                     if let jsonRange = vm.mailerOutput.range(
                         of: #"\{[\s\S]*\}"#, 
                         options: [.regularExpression, .backwards]
@@ -1128,67 +923,77 @@ func splitClientDog(_ givenName: String) -> Client {
     return Client(name: name, dog: dog)
 }
 
+struct StateVariables {
+    let invoiceId: String
+    let fetchableCategory: String
+    let fetchableFile: String
+    let finalEmail: String
+    let finalSubject: String
+    let finalHtml: String
+    let includeQuote: Bool
+} 
+
+enum ArgError: Error {
+    case missingArgumentComponents
+}
 
 struct MailerArguments {
     let client: String
     let email: String
     let dog: String
-    let category: MailerCategory
-    let file: MailerFile
-    // let date: String
-    // let time: String
-    // let location: String
-    // let areaCode: String?
-    // let street: String?
-    // let number: String?
+    let category: MailerCategory?
+    let file: MailerFile?
     let availabilityJSON: String?
     let needsAvailability: Bool
+    let stateVariables: StateVariables
 
-    // func string(_ local: Bool,_ localLocation: String) -> String {
-    func string(_ includeBinaryName: Bool = true) -> String {
-        if includeBinaryName {
-            let components: [String] = [
-                "mailer",
-                "\(category.rawValue)",
-                "--client \"\(client)\"",
-                "--email \"\(email)\"",
-                "--dog \"\(dog)\"",
-                file == .none || file == .issue || file == .confirmation || file == .review ? nil : "--\(file.rawValue)",
-                needsAvailability ? "--availability-json '\(availabilityJSON ?? "")'": nil,
-                // "--date \"\(date)\"",
-                // "--time \"\(time)\"",
-                // "--location \"\(local ? localLocation : location)\""
-                ""
-            ]
-            .compactMap { $0 } 
-
-            // if let areaCode = areaCode, !areaCode.isEmpty, !local {
-            //     components.append("--area-code \"\(areaCode)\"")
-            // }
-            // if let street = street, !street.isEmpty, !local {
-            //     components.append("--street \"\(street)\"")
-            // }
-            // if let number = number, !number.isEmpty, !local {
-            //     components.append("--number \"\(number)\"")
-            // }
-
-            return components.joined(separator: " ")
-        } else {
-            let components: [String] = [
-                "\(category.rawValue)",
-                "--client \"\(client)\"",
-                "--email \"\(email)\"",
-                "--dog \"\(dog)\"",
-                file == .none || file == .issue || file == .confirmation || file == .review ? nil : "--\(file.rawValue)",
-                needsAvailability ? "--availability-json '\(availabilityJSON ?? "")'": nil,
-                ""
-            ]
-            .compactMap { $0 } 
-
-            return components.joined(separator: " ")
+    func string(_ includeBinaryName: Bool = false) throws -> String {
+        guard let cat = category, let f = file else {
+            throw ArgError.missingArgumentComponents
         }
-    }
 
+        var components: [String] = []
+
+        if includeBinaryName {
+            components.insert("mailer", at: 0)
+        }
+
+        switch cat {
+        case .invoice:
+            components.append("invoice \(stateVariables.invoiceId) --responder")
+            if f == .expired {
+                components.append("--expired")
+            }
+
+        case .template: 
+            components.append("template-api \(stateVariables.fetchableCategory) \(stateVariables.fetchableFile)")
+
+        case .custom:
+            components.append("custom-message --email \"\(stateVariables.finalEmail)\" --subject \"\(stateVariables.finalSubject)\" --body \"\(stateVariables.finalHtml)\"")
+
+            if  stateVariables.includeQuote {
+                components.append(" --quote")
+            }
+
+        default:
+            components.append(cat.rawValue)
+            components.append(f.rawValue)
+            components.append("--client \"\(client)\"")
+            components.append("--email \"\(email)\"")
+            components.append("--dog \"\(dog)\"")
+
+            if !(f == .issue || f == .confirmation || f == .review) {
+                components.append(f.rawValue)
+            }
+
+            if needsAvailability {
+                components.append("--availability-json '\(availabilityJSON ?? "")'")
+            }
+        }
+
+        let compacted = components.compactMap { $0 }
+        return compacted.joined(separator: " ")
+    }
 }
 
 func executeMailer(_ arguments: String) throws {
@@ -1222,37 +1027,3 @@ func executeMailer(_ arguments: String) throws {
         throw error
     }
 }
-
-
-// Replace '|' with space, split by whitespace, remove empty parts, and join back
-extension String {
-    var normalizedForSearch: String {
-        return self.folding(options: .diacriticInsensitive, locale: .current)
-            .replacingOccurrences(of: "|", with: " ")
-            .components(separatedBy: CharacterSet.whitespacesAndNewlines)
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
-            .lowercased()
-    }
-}
-
-extension String {
-    func wrapJsonForCLI() -> String {
-        return "'[\(self)]'"
-    }
-}
-
-// struct ContentView: View {
-//     var body: some View {
-//         ResponderView()
-//     }
-// }
-
-// @main
-// struct ResponderApp: App {
-//     var body: some Scene {
-//         WindowGroup {
-//             ContentView()
-//         }
-//     }
-// }

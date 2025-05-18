@@ -51,9 +51,4 @@ struct MailerStandardOutput: View {
             }
         }
     }
-
-    // private func copyMailerOutput() {
-    //     copyToClipboard(vm.mailerOutput)
-    // }
-
 }
