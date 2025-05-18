@@ -714,7 +714,7 @@ struct Responder: View {
                     .padding(.top, 10)
                 }
             }
-            .frame(width: 700)
+            .frame(minWidth: 500)
             
         }
         .padding()
@@ -977,13 +977,12 @@ struct MailerArguments {
 
         default:
             components.append(cat.rawValue)
-            components.append(f.rawValue)
             components.append("--client \"\(client)\"")
             components.append("--email \"\(email)\"")
             components.append("--dog \"\(dog)\"")
 
             if !(f == .issue || f == .confirmation || f == .review) {
-                components.append(f.rawValue)
+                components.append("--\(f.rawValue)")
             }
 
             if needsAvailability {
