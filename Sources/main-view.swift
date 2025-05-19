@@ -183,6 +183,7 @@ struct Responder: View {
     // }
 
     @StateObject private var weeklyScheduleVm = WeeklyScheduleViewModel()
+    @StateObject private var contactsVm = ContactsListViewModel()
 
     private var availabilityDict: [String: [String:String]] {
         return weeklyScheduleVm.availabilityContent.time_range()
@@ -415,12 +416,16 @@ struct Responder: View {
                 VStack {
                     if !(selectedCategory == .template || selectedCategory == .invoice) {
                         HStack {
-                            StandardButton(
-                                type: .load, 
-                                title: "Load contacts"
-                            ) {
-                                requestContactsAccess()
-                            }
+                            // StandardButton(
+                            //     type: .load, 
+                            //     title: "Load contacts"
+                            // ) {
+                            //     do {
+                            //         try await requestContactsAccess()
+                            //     } catch {
+                            //         print(error)
+                            //     }
+                            // }
 
                             // Button("Load Contacts") {
                             //     requestContactsAccess()
@@ -448,64 +453,84 @@ struct Responder: View {
 
                 VStack(alignment: .leading) {
                     if !(selectedCategory == .template || selectedCategory == .invoice) {
-                        // Contact Search Bar
-                        TextField("Search Contacts", text: $searchQuery)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .padding(.horizontal)
 
-                        if (anyInvalidConditionsCheck && contactExtractionError) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.headline)
-                                    .accessibilityHidden(true)
-
-                                Text("ContactExtractionError: client or dog name is invalid")
-                                .font(.subheadline)
-                                .bold()
-                            }
-                            .foregroundColor(.white)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 16)
-                            .background(Color.red)
-                            .cornerRadius(8)
-                            .padding(.horizontal)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                            .animation(.easeInOut, value: (anyInvalidConditionsCheck && contactExtractionError))
-                        }
-
-                        // Contact List
-                        List(filteredContacts, id: \.identifier) { contact in
-                          Button(action: {
+                        ContactsListView(
+                            viewModel: contactsVm,
+                            maxListHeight: 200
+                        ) { contact in
+                            // your old selection logic:
                             clearContact()
                             selectedContact = contact
-
-                            let split = splitClientDog(contact.givenName)
+                            let split = try splitClientDog(from: contact.givenName)
                             client = split.name
                             dog    = split.dog
                             email  = contact.emailAddresses.first?.value as String? ?? ""
-
                             if let addr = contact.postalAddresses.first?.value {
-                              location = addr.city
-                              street   = addr.street
-                              areaCode = addr.postalCode
+                                location = addr.city
+                                street   = addr.street
+                                areaCode = addr.postalCode
                             }
-                          }) {
-                            HStack {
-                              Text("\(contact.givenName) \(contact.familyName)")
-                                .font(
-                                  selectedContact?.identifier == contact.identifier
-                                  ? .headline
-                                  : .body
-                                )
-                              Spacer()
-                              Text(contact.emailAddresses.first?.value as String? ?? "")
-                                .foregroundColor(.gray)
-                            }
-                          }
                         }
-                        .scrollContentBackground(.hidden) 
-                        .frame(height: 200)
-                        .padding()
+                        .frame(maxWidth: 350)
+
+                        // // Contact Search Bar
+                        // TextField("Search Contacts", text: $searchQuery)
+                        //     .textFieldStyle(RoundedBorderTextFieldStyle())
+                        //     .padding(.horizontal)
+
+                        // if (anyInvalidConditionsCheck && contactExtractionError) {
+                        //     HStack(spacing: 8) {
+                        //         Image(systemName: "exclamationmark.triangle.fill")
+                        //             .font(.headline)
+                        //             .accessibilityHidden(true)
+
+                        //         Text("ContactExtractionError: client or dog name is invalid")
+                        //         .font(.subheadline)
+                        //         .bold()
+                        //     }
+                        //     .foregroundColor(.white)
+                        //     .padding(.vertical, 10)
+                        //     .padding(.horizontal, 16)
+                        //     .background(Color.red)
+                        //     .cornerRadius(8)
+                        //     .padding(.horizontal)
+                        //     .transition(.move(edge: .top).combined(with: .opacity))
+                        //     .animation(.easeInOut, value: (anyInvalidConditionsCheck && contactExtractionError))
+                        // }
+
+                        // // Contact List
+                        // List(filteredContacts, id: \.identifier) { contact in
+                        //   Button(action: {
+                        //     clearContact()
+                        //     selectedContact = contact
+
+                        //     let split = splitClientDog(contact.givenName)
+                        //     client = split.name
+                        //     dog    = split.dog
+                        //     email  = contact.emailAddresses.first?.value as String? ?? ""
+
+                        //     if let addr = contact.postalAddresses.first?.value {
+                        //       location = addr.city
+                        //       street   = addr.street
+                        //       areaCode = addr.postalCode
+                        //     }
+                        //   }) {
+                        //     HStack {
+                        //       Text("\(contact.givenName) \(contact.familyName)")
+                        //         .font(
+                        //           selectedContact?.identifier == contact.identifier
+                        //           ? .headline
+                        //           : .body
+                        //         )
+                        //       Spacer()
+                        //       Text(contact.emailAddresses.first?.value as String? ?? "")
+                        //         .foregroundColor(.gray)
+                        //     }
+                        //   }
+                        // }
+                        // .scrollContentBackground(.hidden) 
+                        // .frame(height: 200)
+                        // .padding()
                     }
 
                     Text("Mailer Arguments").bold()
@@ -718,9 +743,9 @@ struct Responder: View {
             
         }
         .padding()
-        .onAppear {
-            fetchContacts()
-        }
+        // .onAppear {
+        //     fetchContacts()
+        // }
         .alert(isPresented: $showAlert) {
             Alert(
                 title: Text(alertTitle),
@@ -742,31 +767,31 @@ struct Responder: View {
             // .replacingOccurrences(of: "{{email}}", with: email)
     }
 
-    private func requestContactsAccess() {
-        let store = CNContactStore()
-        store.requestAccess(for: .contacts) { granted, error in
-            if granted {
-                fetchContacts()
-            } else {
-                print("Access denied: \(error?.localizedDescription ?? "Unknown error")")
-            }
-        }
-    }
+    // private func requestContactsAccess() {
+    //     let store = CNContactStore()
+    //     store.requestAccess(for: .contacts) { granted, error in
+    //         if granted {
+    //             fetchContacts()
+    //         } else {
+    //             print("Access denied: \(error?.localizedDescription ?? "Unknown error")")
+    //         }
+    //     }
+    // }
 
-    private func fetchContacts() {
-        let store = CNContactStore()
-        let keys = [CNContactGivenNameKey, CNContactFamilyNameKey, CNContactEmailAddressesKey, CNContactPostalAddressesKey] as [CNKeyDescriptor]
-        let request = CNContactFetchRequest(keysToFetch: keys)
+    // private func fetchContacts() {
+    //     let store = CNContactStore()
+    //     let keys = [CNContactGivenNameKey, CNContactFamilyNameKey, CNContactEmailAddressesKey, CNContactPostalAddressesKey] as [CNKeyDescriptor]
+    //     let request = CNContactFetchRequest(keysToFetch: keys)
 
-        var fetchedContacts: [CNContact] = []
-        try? store.enumerateContacts(with: request) { contact, _ in
-            fetchedContacts.append(contact)
-        }
+    //     var fetchedContacts: [CNContact] = []
+    //     try? store.enumerateContacts(with: request) { contact, _ in
+    //         fetchedContacts.append(contact)
+    //     }
 
-        DispatchQueue.main.async {
-            contacts = fetchedContacts
-        }
-    }
+    //     DispatchQueue.main.async {
+    //         contacts = fetchedContacts
+    //     }
+    // }
 
     // change this according to view params (Responder / Picker diffs)
     private func cleanThisView() {
@@ -902,26 +927,26 @@ struct Responder: View {
     }
 }
 
-struct Client {
-    let name: String
-    let dog: String
-}
+// struct Client {
+//     let name: String
+//     let dog: String
+// }
 
-func splitClientDog(_ givenName: String) -> Client {
-    var name = "ERR"
-    var dog = "ERR"
+// func splitClientDog(_ givenName: String) -> Client {
+//     var name = "ERR"
+//     var dog = "ERR"
 
-    let split = givenName.components(separatedBy: " | ")
+//     let split = givenName.components(separatedBy: " | ")
 
-    if split.count == 2 {
-        name = String(split[0]).trimTrailing()
-        dog = String(split[1]).trimTrailing()
-    } else {
-        print("Invalid input format: expected 'ClientName | DogName'")
-    }
+//     if split.count == 2 {
+//         name = String(split[0]).trimTrailing()
+//         dog = String(split[1]).trimTrailing()
+//     } else {
+//         print("Invalid input format: expected 'ClientName | DogName'")
+//     }
 
-    return Client(name: name, dog: dog)
-}
+//     return Client(name: name, dog: dog)
+// }
 
 struct StateVariables {
     let invoiceId: String
