@@ -17,44 +17,44 @@ let htmlDoc = """
 </html>
 """
 
-enum MailerCategory: String, RawRepresentable, CaseIterable {
-    // case none
-    case quote // issue, follow
-    case lead // confirmation, follow
-    case affiliate // enum??
-    // case onboarding // pre-training
-    case service // follow
-    case invoice
-    case resolution
-    case custom
-    case template
-}
+// enum MailerCategory: String, RawRepresentable, CaseIterable {
+//     // case none
+//     case quote // issue, follow
+//     case lead // confirmation, follow
+//     case affiliate // enum??
+//     // case onboarding // pre-training
+//     case service // follow
+//     case invoice
+//     case resolution
+//     case custom
+//     case template
+// }
 
-extension MailerCategory {
-    var filesRequiringAvailability: Set<MailerFile> {
-        switch self {
-            case .lead:       return [.confirmation, .check, .follow]
-            case .service:    return [.follow]
-            default:          return []
-        }
-    }
-}
+// extension MailerCategory {
+//     var filesRequiringAvailability: Set<MailerFile> {
+//         switch self {
+//             case .lead:       return [.confirmation, .check, .follow]
+//             case .service:    return [.follow]
+//             default:          return []
+//         }
+//     }
+// }
 
-enum MailerFile: String, RawRepresentable, CaseIterable {
-    // case none
-    case confirmation
-    case issue 
-    case follow
-    case expired 
-    // case preTraining
-    case onboarding
-    case review
-    case check
-    case food
-    case template
-    case message
-    case fetch
-}
+// enum MailerFile: String, RawRepresentable, CaseIterable {
+//     // case none
+//     case confirmation
+//     case issue 
+//     case follow
+//     case expired 
+//     // case preTraining
+//     case onboarding
+//     case review
+//     case check
+//     case food
+//     case template
+//     case message
+//     case fetch
+// }
 
 extension String {
     /// Returns the first capture‐group for `pattern`, or nil.
@@ -104,86 +104,52 @@ struct Responder: View {
 
     @State private var invoiceId = ""
 
-    private let mailerCategories = MailerCategory.allCases
-    private let mailerFiles = MailerFile.allCases
+    // private let mailerCategories = MailerCategory.allCases
+    // private let mailerFiles = MailerFile.allCases
 
-    @State private var selectedCategory: MailerCategory? = nil
-    @State private var selectedFile: MailerFile? = nil
+//     @State private var selectedCategory: MailerCategory? = nil
+//     @State private var selectedFile: MailerFile? = nil
 
-    private let validFilesForCategory: [MailerCategory: [MailerFile]] = [
-        .quote: [.issue, .follow],  // No confirmation for quotes
-        .lead: [.confirmation, .check, .follow], 
-        .affiliate: [.food],  // No valid files for affiliate (empty array)
-        // .onboarding: [.preTraining], 
-        .service: [.follow, .onboarding], 
-        .invoice: [.issue, .expired],
-        .resolution: [.review],
-        .custom: [.message],
-        .template: [.fetch]
-    ]
+//     private let validFilesForCategory: [MailerCategory: [MailerFile]] = [
+//         .quote: [.issue, .follow],  // No confirmation for quotes
+//         .lead: [.confirmation, .check, .follow], 
+//         .affiliate: [.food],  // No valid files for affiliate (empty array)
+//         // .onboarding: [.preTraining], 
+//         .service: [.follow, .onboarding], 
+//         .invoice: [.issue, .expired],
+//         .resolution: [.review],
+//         .custom: [.message],
+//         .template: [.fetch]
+//     ]
 
-    // private func resetFileIfInvalid() {
-    //     guard
-    //       let category = selectedCategory,
-    //       let file     = selectedFile,
-    //       let allowed  = validFilesForCategory[category],
-    //       !allowed.contains(file)
-    //     else { return }
+//     private var availableFiles: [MailerFile] {
+//         guard let category = selectedCategory else { return [] }
+//         return validFilesForCategory[category] ?? []
+//     }
 
-    //     selectedFile = nil
-    // }
+//     private func isFileDisabled(_ file: MailerFile) -> Bool {
+//         guard
+//           let category = selectedCategory,
+//           let allowed  = validFilesForCategory[category]
+//         else { return true }   // disable everything if no category
+//         return !allowed.contains(file)
+//     }
 
-    private var availableFiles: [MailerFile] {
-        guard let category = selectedCategory else { return [] }
-        return validFilesForCategory[category] ?? []
-    }
+//     private var disabledFileSelected: Bool {
+//         selectedFile.map { isFileDisabled($0) } ?? false
+//     }
 
-    private func isFileDisabled(_ file: MailerFile) -> Bool {
-        guard
-          let category = selectedCategory,
-          let allowed  = validFilesForCategory[category]
-        else { return true }   // disable everything if no category
-        return !allowed.contains(file)
-    }
-
-    private var disabledFileSelected: Bool {
-        selectedFile.map { isFileDisabled($0) } ?? false
-    }
-
-    private var needsAvailability: Bool {
-        guard
-          let category = selectedCategory,
-          let file     = selectedFile
-        else { return false }
-        return category.filesRequiringAvailability.contains(file)
-    }
-
-    // @State private var weeklySchedule = Dictionary(
-    //     uniqueKeysWithValues: MailerAPIWeekday.allCases.map {
-    //         ($0, MailerAPIDaySchedule(defaultsFor: $0))
-    //     }
-    // )
-
-    /// Builds a `[String:[String:String]]` from your `weeklySchedule`
-    // private var availabilityDict: [String:[String:String]] {
-    //     var out = [String:[String:String]]()
-    //     let df: DateFormatter = {
-    //         let f = DateFormatter(); f.dateFormat = "HH:mm"; return f
-    //     }()
-    //     for day in MailerAPIWeekday.allCases {
-    //         if let sched = weeklySchedule[day], sched.enabled {
-    //             out[day.rawValue] = [
-    //                 "start": df.string(from: sched.start),
-    //                 "end":   df.string(from: sched.end)
-    //             ]
-    //         }
-    //     }
-    //     return out
-
-    // }
+//     private var needsAvailability: Bool {
+//         guard
+//           let category = selectedCategory,
+//           let file     = selectedFile
+//         else { return false }
+//         return category.filesRequiringAvailability.contains(file)
+//     }
 
     @StateObject private var weeklyScheduleVm = WeeklyScheduleViewModel()
     @StateObject private var contactsVm = ContactsListViewModel()
+    @StateObject private var apiPathVm = MailerAPISelectionViewModel()
 
     private var availabilityDict: [String: [String:String]] {
         return weeklyScheduleVm.availabilityContent.time_range()
@@ -197,14 +163,13 @@ struct Responder: View {
         return json
     }
 
+    // var isCustomCategorySelected: Bool {
+    //     return (selectedCategory == .custom)
+    // }
 
-    var isCustomCategorySelected: Bool {
-        return (selectedCategory == .custom)
-    }
-
-    var isTemplateCategorySelected: Bool {
-        return (selectedCategory == .custom)
-    }
+    // var isTemplateCategorySelected: Bool {
+    //     return (selectedCategory == .custom)
+    // }
 
     var finalSubject: String {
         return replaceTemplateVariables(subject)
@@ -233,25 +198,21 @@ struct Responder: View {
 
     private var anyInvalidConditionsCheck: Bool {
         // if custom/template, be more tolerant about starting mailer
-        if (isTemplateCategorySelected) {
+        if (apiPathVm.selectedRoute == .template) {
             return false
         // if custom/.., check the html body for raw variables
-        } else if (isCustomCategorySelected) {
+        } else if (apiPathVm.selectedRoute == .custom) {
             return (finalHtmlContainsRawVariables || contactExtractionError || emptySubjectWarning || emptyEmailWarning)
         // otherwise, check for parsing errs in client / dog names in primary templates
         } else {
-            if contactExtractionError {
-                return true
-            // if all that clears, do not raise invalid marker
-            } else {
+            // if contactExtractionError {
+            //     return true
+            // // if all that clears, do not raise invalid marker
+            // } else {
                 return false
-            }
+            // }
         }
     }
-
-    // var mailerCommand: String {
-    //     return (try? constructMailerCommand()) ?? ""
-    // }
 
     func constructMailerCommand(_ includeBinaryName: Bool = false) throws -> String {
         let stateVars = StateVariables(
@@ -268,10 +229,10 @@ struct Responder: View {
             client: client,
             email: finalEmail,
             dog: dog,
-            category: selectedCategory,
-            file: selectedFile,
+            route: apiPathVm.selectedRoute,
+            endpoint: apiPathVm.selectedEndpoint,
             availabilityJSON: availabilityJSON,
-            needsAvailability: needsAvailability,
+            needsAvailability: apiPathVm.endpointNeedsAvailabilityVariable,
             stateVariables: stateVars
         )
         return try args.string(includeBinaryName)
@@ -320,120 +281,15 @@ struct Responder: View {
 
     var body: some View {
         HStack {
-            // SwipeFadeContainer(threshold: 80, animationDuration: 0.25) {
-            VStack {
-                HStack {
-                    VStack {
-                        // Text("Category").bold()
-                        SectionTitle(title: "Category", width: 150)
-
-                        ScrollView {
-                            VStack(spacing: 5) {
-                                ForEach(mailerCategories, id: \.self) { category in
-                                    SelectableRow(
-                                        title: category.rawValue.capitalized,
-                                        isSelected: selectedCategory == category,
-                                        animationDuration: 0.3
-                                    ) {
-                                        if selectedCategory == category {
-                                            selectedCategory = nil
-                                        } else {
-                                            selectedCategory = category
-                                        }
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                }
-                            }
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
-                        }
-                    }
-                    .frame(width: 150)
-
-                    VStack {
-                        SectionTitle(title: "File", width: 150)
-
-                        ScrollView {
-                            VStack(spacing: 5) {
-                                ForEach(availableFiles, id: \.self) { file in
-                                    SelectableRow(
-                                        title: file.rawValue.capitalized,
-                                        isSelected: selectedFile == file
-                                    ) {
-                                        if selectedFile == file {
-                                            selectedFile = nil
-                                        } else {
-                                            selectedFile = file
-                                        }
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                }
-                            }
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
-                        }
-
-                        // if (disabledFileSelected) {
-                        //     HStack(spacing: 8) {
-                        //         Image(systemName: "exclamationmark.triangle.fill")
-                        //             .font(.headline)
-                        //             .accessibilityHidden(true)
-
-                        //         Text("Select a template for this category")
-                        //         .font(.subheadline)
-                        //         .bold()
-                        //     }
-                        //     .foregroundColor(.black)
-                        //     .padding(.vertical, 10)
-                        //     .padding(.horizontal, 16)
-                        //     .background(Color.yellow)
-                        //     .cornerRadius(8)
-                        //     .padding(.horizontal)
-                        //     .transition(.move(edge: .top).combined(with: .opacity))
-                        //     .animation(.easeInOut, value: (disabledFileSelected))
-                        // }
-
-                    }
-                    .frame(width: 150)
-                }
-
-                if disabledFileSelected {
-                    NotificationBanner(
-                        type: .info,
-                        message: "No template selected"
-                    )
-                }
-
-                if selectedCategory == .invoice {
-                    NotificationBanner(
-                        type: .error,
-                        message: "these are not quotes casper!"
-                    )
-                }
-            }
+            MailerAPIPathSelectionView(viewModel: apiPathVm)
+            .frame(width: 500)
 
             VStack {
                 VStack {
-                    if !(selectedCategory == .template || selectedCategory == .invoice) {
+                    if !(apiPathVm.selectedRoute == .template || apiPathVm.selectedRoute == .invoice) {
                         HStack {
-                            // StandardButton(
-                            //     type: .load, 
-                            //     title: "Load contacts"
-                            // ) {
-                            //     do {
-                            //         try await requestContactsAccess()
-                            //     } catch {
-                            //         print(error)
-                            //     }
-                            // }
-
-                            // Button("Load Contacts") {
-                            //     requestContactsAccess()
-                            // }
 
                             Spacer()
-
-                            // Toggle("Local Location", isOn: $local)
 
                             StandardToggle(
                                 style: .switch,
@@ -441,10 +297,7 @@ struct Responder: View {
                                 title: "Local Location",
                                 subtitle: nil
                             )
-
-                            // .padding()
                         }
-
                     }
                 }
                 .frame(maxWidth: 350)
@@ -452,8 +305,7 @@ struct Responder: View {
                 Divider()
 
                 VStack(alignment: .leading) {
-                    if !(selectedCategory == .template || selectedCategory == .invoice) {
-
+                    if !(apiPathVm.selectedRoute == .template || apiPathVm.selectedRoute == .invoice) {
                         ContactsListView(
                             viewModel: contactsVm,
                             maxListHeight: 200,
@@ -474,30 +326,12 @@ struct Responder: View {
                                 clearContact()
                             }
                         )
-                        // ) { contact in
-
-                        //     // if contactsVm.selectedContactId == nil {
-                        //     //     clearContact()
-                        //     // }
-
-                        //     clearContact()
-                        //     selectedContact = contact
-                        //     let split = try splitClientDog(from: contact.givenName)
-                        //     client = split.name
-                        //     dog    = split.dog
-                        //     email  = contact.emailAddresses.first?.value as String? ?? ""
-                        //     if let addr = contact.postalAddresses.first?.value {
-                        //         location = addr.city
-                        //         street   = addr.street
-                        //         areaCode = addr.postalCode
-                        //     }
-                        // }
                         .frame(maxWidth: 350)
                     }
 
                     Text("Mailer Arguments").bold()
                     
-                    if selectedCategory == .template {
+                    if apiPathVm.selectedRoute == .template {
                         HStack {
                             TextField("Category", text: $fetchableCategory)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -507,7 +341,7 @@ struct Responder: View {
                             TextField("File", text: $fetchableFile)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                         }
-                    } else if selectedCategory == .invoice {
+                    } else if apiPathVm.selectedRoute == .invoice {
                         TextField("invoice id (integer)", text: $invoiceId)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                     } else {
@@ -560,10 +394,9 @@ struct Responder: View {
                                 clearContact()
                             }
 
-
                             Spacer()
 
-                            if selectedFile == .message {
+                            if apiPathVm.selectedEndpoint == .messageSend {
                                 StandardToggle(
                                     style: .switch,
                                     isOn: $includeQuoteInCustomMessage,
@@ -574,7 +407,6 @@ struct Responder: View {
                             }
                         }
                         .frame(maxWidth: 350)
-
                     }
                 }
                 .padding()
@@ -584,7 +416,7 @@ struct Responder: View {
             Divider()
 
             VStack {
-                if isCustomCategorySelected {
+                if apiPathVm.selectedRoute == .custom {
                     VStack(alignment: .leading) {
 
                         TextField("Subject", text: $subject)
@@ -597,18 +429,9 @@ struct Responder: View {
                             )
                         }
 
-
                         Text("Template HTML").bold()
 
-
                         CodeEditor(text: $fetchedHtml)
-
-                        // TextEditor(text: $fetchedHtml)
-                        // .font(.system(.body, design: .monospaced))
-                        // .border(Color.gray)
-                        // .frame(minHeight: 300)
-
-                        // .frame(minWidth: 300)
 
                         if (anyInvalidConditionsCheck && finalHtmlContainsRawVariables) {
                             NotificationBanner(
@@ -630,7 +453,7 @@ struct Responder: View {
                     .padding()
                 } else {
 
-                    if needsAvailability {
+                    if apiPathVm.endpointNeedsAvailabilityVariable {
                         VStack(alignment: .leading, spacing: 8) {
                             WeeklyScheduleView(viewModel: weeklyScheduleVm)
                         }
@@ -670,7 +493,7 @@ struct Responder: View {
                         .animation(.easeInOut(duration: 0.3), value: isSendingEmail)
                     }
 
-                    if selectedCategory == .invoice && selectedFile == .expired {
+                    if apiPathVm.selectedRoute == .invoice && apiPathVm.selectedEndpoint == .expired {
                         NotificationBanner(
                             type: .warning,
                             message: "You are sending an overdue reminder"
@@ -692,9 +515,8 @@ struct Responder: View {
                         .disabled(
                             isSendingEmail || 
                             anyInvalidConditionsCheck || 
-                            disabledFileSelected ||
-                            selectedCategory == nil ||
-                            selectedFile == nil
+                            // disabledFileSelected ||
+                            apiPathVm.routeOrEndpointIsNil()
                         )
 
                     }
@@ -702,12 +524,8 @@ struct Responder: View {
                 }
             }
             .frame(minWidth: 500)
-            
         }
         .padding()
-        // .onAppear {
-        //     fetchContacts()
-        // }
         .alert(isPresented: $showAlert) {
             Alert(
                 title: Text(alertTitle),
@@ -715,10 +533,6 @@ struct Responder: View {
                 dismissButton: .default(Text("OK"))
             )
         }
-
-        // .onChange(of: mailerCommand) { oldValue, newValue in
-        //     vm.sharedMailerCommandCopy = newValue
-        // }
     }
 
     func replaceTemplateVariables(_ string: String) -> String {
@@ -728,32 +542,6 @@ struct Responder: View {
             .replacingOccurrences(of: "{{dog}}", with: (dog.isEmpty ? "{{dog}}" : dog))
             // .replacingOccurrences(of: "{{email}}", with: email)
     }
-
-    // private func requestContactsAccess() {
-    //     let store = CNContactStore()
-    //     store.requestAccess(for: .contacts) { granted, error in
-    //         if granted {
-    //             fetchContacts()
-    //         } else {
-    //             print("Access denied: \(error?.localizedDescription ?? "Unknown error")")
-    //         }
-    //     }
-    // }
-
-    // private func fetchContacts() {
-    //     let store = CNContactStore()
-    //     let keys = [CNContactGivenNameKey, CNContactFamilyNameKey, CNContactEmailAddressesKey, CNContactPostalAddressesKey] as [CNKeyDescriptor]
-    //     let request = CNContactFetchRequest(keysToFetch: keys)
-
-    //     var fetchedContacts: [CNContact] = []
-    //     try? store.enumerateContacts(with: request) { contact, _ in
-    //         fetchedContacts.append(contact)
-    //     }
-
-    //     DispatchQueue.main.async {
-    //         contacts = fetchedContacts
-    //     }
-    // }
 
     // change this according to view params (Responder / Picker diffs)
     private func cleanThisView() {
@@ -851,7 +639,7 @@ struct Responder: View {
                 // end of color mechanism
 
                 // also parse / extract html body if it was a template call:
-                if selectedCategory == .template {
+                if (apiPathVm.isTemplateFetch) {
                     if let jsonRange = vm.mailerOutput.range(
                         of: #"\{[\s\S]*\}"#, 
                         options: [.regularExpression, .backwards]
@@ -889,27 +677,6 @@ struct Responder: View {
     }
 }
 
-// struct Client {
-//     let name: String
-//     let dog: String
-// }
-
-// func splitClientDog(_ givenName: String) -> Client {
-//     var name = "ERR"
-//     var dog = "ERR"
-
-//     let split = givenName.components(separatedBy: " | ")
-
-//     if split.count == 2 {
-//         name = String(split[0]).trimTrailing()
-//         dog = String(split[1]).trimTrailing()
-//     } else {
-//         print("Invalid input format: expected 'ClientName | DogName'")
-//     }
-
-//     return Client(name: name, dog: dog)
-// }
-
 struct StateVariables {
     let invoiceId: String
     let fetchableCategory: String
@@ -928,14 +695,14 @@ struct MailerArguments {
     let client: String
     let email: String
     let dog: String
-    let category: MailerCategory?
-    let file: MailerFile?
+    let route: MailerAPIRoute?
+    let endpoint: MailerAPIEndpoint?
     let availabilityJSON: String?
     let needsAvailability: Bool
     let stateVariables: StateVariables
 
     func string(_ includeBinaryName: Bool = false) throws -> String {
-        guard let cat = category, let f = file else {
+        guard let r = route, let e = endpoint else {
             throw ArgError.missingArgumentComponents
         }
 
@@ -945,10 +712,10 @@ struct MailerArguments {
             components.insert("mailer", at: 0)
         }
 
-        switch cat {
+        switch r {
         case .invoice:
             components.append("invoice \(stateVariables.invoiceId) --responder")
-            if f == .expired {
+            if e == .expired {
                 components.append("--expired")
             }
 
@@ -963,13 +730,13 @@ struct MailerArguments {
             }
 
         default:
-            components.append(cat.rawValue)
+            components.append(r.rawValue)
             components.append("--client \"\(client)\"")
             components.append("--email \"\(email)\"")
             components.append("--dog \"\(dog)\"")
 
-            if !(f == .issue || f == .confirmation || f == .review) {
-                components.append("--\(f.rawValue)")
+            if !(e == .issue || e == .confirmation || e == .review) {
+                components.append("--\(e.rawValue)")
             }
 
             if needsAvailability {
