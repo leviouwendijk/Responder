@@ -456,81 +456,43 @@ struct Responder: View {
 
                         ContactsListView(
                             viewModel: contactsVm,
-                            maxListHeight: 200
-                        ) { contact in
-                            // your old selection logic:
-                            clearContact()
-                            selectedContact = contact
-                            let split = try splitClientDog(from: contact.givenName)
-                            client = split.name
-                            dog    = split.dog
-                            email  = contact.emailAddresses.first?.value as String? ?? ""
-                            if let addr = contact.postalAddresses.first?.value {
-                                location = addr.city
-                                street   = addr.street
-                                areaCode = addr.postalCode
+                            maxListHeight: 200,
+                            onSelect: { contact in
+                                clearContact()
+                                selectedContact = contact
+                                let split = try splitClientDog(from: contact.givenName)
+                                client = split.name
+                                dog    = split.dog
+                                email  = contact.emailAddresses.first?.value as String? ?? ""
+                                if let addr = contact.postalAddresses.first?.value {
+                                    location = addr.city
+                                    street   = addr.street
+                                    areaCode = addr.postalCode
+                                }
+                            },
+                            onDeselect: {
+                                clearContact()
                             }
-                        }
-                        .frame(maxWidth: 350)
+                        )
+                        // ) { contact in
 
-                        // // Contact Search Bar
-                        // TextField("Search Contacts", text: $searchQuery)
-                        //     .textFieldStyle(RoundedBorderTextFieldStyle())
-                        //     .padding(.horizontal)
+                        //     // if contactsVm.selectedContactId == nil {
+                        //     //     clearContact()
+                        //     // }
 
-                        // if (anyInvalidConditionsCheck && contactExtractionError) {
-                        //     HStack(spacing: 8) {
-                        //         Image(systemName: "exclamationmark.triangle.fill")
-                        //             .font(.headline)
-                        //             .accessibilityHidden(true)
-
-                        //         Text("ContactExtractionError: client or dog name is invalid")
-                        //         .font(.subheadline)
-                        //         .bold()
-                        //     }
-                        //     .foregroundColor(.white)
-                        //     .padding(.vertical, 10)
-                        //     .padding(.horizontal, 16)
-                        //     .background(Color.red)
-                        //     .cornerRadius(8)
-                        //     .padding(.horizontal)
-                        //     .transition(.move(edge: .top).combined(with: .opacity))
-                        //     .animation(.easeInOut, value: (anyInvalidConditionsCheck && contactExtractionError))
-                        // }
-
-                        // // Contact List
-                        // List(filteredContacts, id: \.identifier) { contact in
-                        //   Button(action: {
                         //     clearContact()
                         //     selectedContact = contact
-
-                        //     let split = splitClientDog(contact.givenName)
+                        //     let split = try splitClientDog(from: contact.givenName)
                         //     client = split.name
                         //     dog    = split.dog
                         //     email  = contact.emailAddresses.first?.value as String? ?? ""
-
                         //     if let addr = contact.postalAddresses.first?.value {
-                        //       location = addr.city
-                        //       street   = addr.street
-                        //       areaCode = addr.postalCode
+                        //         location = addr.city
+                        //         street   = addr.street
+                        //         areaCode = addr.postalCode
                         //     }
-                        //   }) {
-                        //     HStack {
-                        //       Text("\(contact.givenName) \(contact.familyName)")
-                        //         .font(
-                        //           selectedContact?.identifier == contact.identifier
-                        //           ? .headline
-                        //           : .body
-                        //         )
-                        //       Spacer()
-                        //       Text(contact.emailAddresses.first?.value as String? ?? "")
-                        //         .foregroundColor(.gray)
-                        //     }
-                        //   }
                         // }
-                        // .scrollContentBackground(.hidden) 
-                        // .frame(height: 200)
-                        // .padding()
+                        .frame(maxWidth: 350)
                     }
 
                     Text("Mailer Arguments").bold()
