@@ -678,7 +678,7 @@ struct Responder: View {
                     }
 
                     HStack {
-                        StandardButton(
+                        StandardEscapableButton(
                             type: .execute, 
                             title: "Run mailer", 
                             subtitle: "Starts mailer background process"
