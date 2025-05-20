@@ -218,13 +218,20 @@ struct Responder: View {
                     
                     if apiPathVm.selectedRoute == .template {
                         HStack {
-                            TextField("Category", text: $fetchableCategory)
+                            TextField("route", text: $fetchableCategory)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
 
                             Text("/")
 
-                            TextField("File", text: $fetchableFile)
+                            TextField("endpoint", text: $fetchableFile)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .onSubmit {
+                                    do {
+                                        try sendMailerEmail()
+                                    } catch {
+                                        print(error)
+                                    }
+                                }
                         }
                     } else if apiPathVm.selectedRoute == .invoice {
 
@@ -337,7 +344,7 @@ struct Responder: View {
 
                         Text("Template HTML").bold()
 
-                        CodeEditor(text: $fetchedHtml)
+                        CodeEditorContainer(text: $fetchedHtml)
 
                         if (anyInvalidConditionsCheck && finalHtmlContainsRawVariables) {
                             NotificationBanner(
