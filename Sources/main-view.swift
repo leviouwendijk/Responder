@@ -271,7 +271,7 @@ struct Responder: View {
 
                             Spacer()
 
-                            if apiPathVm.selectedEndpoint == .messageSend {
+                            if apiPathVm.selectedRoute == .custom {
                                 StandardToggle(
                                     style: .switch,
                                     isOn: $includeQuoteInCustomMessage,
