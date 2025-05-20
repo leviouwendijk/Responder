@@ -3,43 +3,20 @@ import Contacts
 import EventKit
 import plate
 
-let htmlDoc = """
-<!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="UTF-8">
-    </head>
-    <body>
-
-    ...
-
-    </body>
-</html>
-"""
-
-extension String {
-    /// Returns the first capture‐group for `pattern`, or nil.
-    func firstCapturedGroup(
-      pattern: String,
-      options: NSRegularExpression.Options = []
-    ) -> String? {
-      guard let re = try? NSRegularExpression(pattern: pattern, options: options)
-      else { return nil }
-      let ns = self as NSString
-      let full = NSRange(location: 0, length: ns.length)
-      guard let m = re.firstMatch(in: self, options: [], range: full),
-            m.numberOfRanges >= 2
-      else { return nil }
-      return ns.substring(with: m.range(at: 1))
-    }
-}
-
 struct TemplateFetchResponse: Decodable {
     let success: Bool
     let html: String
 }
 
+
 struct Responder: View {
+    @EnvironmentObject var vm: MailerViewModel
+    @EnvironmentObject var invoiceVm: MailerAPIInvoiceVariablesViewModel
+
+    @StateObject private var weeklyScheduleVm = WeeklyScheduleViewModel()
+    @StateObject private var contactsVm = ContactsListViewModel()
+    @StateObject private var apiPathVm = MailerAPISelectionViewModel()
+
     @State private var client = ""
     @State private var email = ""
 
@@ -55,13 +32,6 @@ struct Responder: View {
     @State private var number: String?
     @State private var localLocation = "Alkmaar"
     @State private var local = false
-
-    @EnvironmentObject var vm: MailerViewModel
-    @EnvironmentObject var invoiceVm: MailerAPIInvoiceVariablesViewModel
-
-    @StateObject private var weeklyScheduleVm = WeeklyScheduleViewModel()
-    @StateObject private var contactsVm = ContactsListViewModel()
-    @StateObject private var apiPathVm = MailerAPISelectionViewModel()
 
     var finalSubject: String {
         return replaceTemplateVariables(subject)
@@ -250,13 +220,10 @@ struct Responder: View {
                                 )
 
                             }
-
                         MailerAPIInvoiceVariablesView(viewModel: invoiceVm)
-
                         // TextField("invoice id (integer)", text: $invoiceId)
                         //     .textFieldStyle(RoundedBorderTextFieldStyle())
                         }
-
                     } else {
                         TextField("Client (variable: \"{{name}}\"", text: $client)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -429,7 +396,6 @@ struct Responder: View {
                         .disabled(
                             isSendingEmail || 
                             anyInvalidConditionsCheck || 
-                            // disabledFileSelected ||
                             apiPathVm.routeOrEndpointIsNil()
                         )
 
@@ -457,9 +423,7 @@ struct Responder: View {
             // .replacingOccurrences(of: "{{email}}", with: email)
     }
 
-    // change this according to view params (Responder / Picker diffs)
     private func cleanThisView() {
-        // clearQueue() // unique to Responder
         clearContact()
         if includeQuoteInCustomMessage {
             includeQuoteInCustomMessage = false
@@ -568,8 +532,6 @@ struct Responder: View {
                         }
                     }
                 }
-
-                // cleanThisView()
 
                 // auto‐dismiss banner
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
