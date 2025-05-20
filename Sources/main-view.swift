@@ -45,14 +45,7 @@ struct Responder: View {
 
     var finalEmail: String {
         email
-        // 1. Split on commas
-        .split(separator: ",")
-        // 2. Trim whitespace/newlines around each piece
-        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        // 3. Drop any empty strings (in case of trailing commas or double-commas)
-        .filter { !$0.isEmpty }
-        // 4. Join back together with a single space
-        .joined(separator: " ")
+        .commaSeparatedValuesToParsableArgument
     }
 
     @State private var dog = ""
@@ -63,23 +56,12 @@ struct Responder: View {
     @State private var localLocation = "Alkmaar"
     @State private var local = false
 
-    @State private var invoiceId = ""
+    @EnvironmentObject var vm: MailerViewModel
+    @EnvironmentObject var invoiceVm: MailerAPIInvoiceVariablesViewModel
 
     @StateObject private var weeklyScheduleVm = WeeklyScheduleViewModel()
     @StateObject private var contactsVm = ContactsListViewModel()
     @StateObject private var apiPathVm = MailerAPISelectionViewModel()
-
-    private var availabilityDict: [String: [String:String]] {
-        return weeklyScheduleVm.availabilityContent.time_range()
-    }
-
-    private var availabilityJSON: String? {
-        guard !availabilityDict.isEmpty,
-              let data = try? JSONSerialization.data(withJSONObject: availabilityDict),
-              let json = String(data: data, encoding: .utf8)
-        else { return nil }
-        return json
-    }
 
     var finalSubject: String {
         return replaceTemplateVariables(subject)
@@ -121,7 +103,7 @@ struct Responder: View {
 
     func constructMailerCommand(_ includeBinaryName: Bool = false) throws -> String {
         let stateVars = StateVariables(
-            invoiceId: invoiceId,
+            invoiceId: invoiceVm.invoiceVariables.invoice_id,
             fetchableCategory: fetchableCategory,
             fetchableFile: fetchableFile,
             finalEmail: finalEmail,
@@ -136,7 +118,7 @@ struct Responder: View {
             dog: dog,
             route: apiPathVm.selectedRoute,
             endpoint: apiPathVm.selectedEndpoint,
-            availabilityJSON: availabilityJSON,
+            availabilityJSON: try? weeklyScheduleVm.availabilityJSON(),
             needsAvailability: apiPathVm.endpointNeedsAvailabilityVariable,
             stateVariables: stateVars
         )
@@ -169,8 +151,6 @@ struct Responder: View {
     @State private var successBannerMessage = ""
 
     @State private var isSendingEmail = false
-
-    @EnvironmentObject var vm: MailerViewModel
 
     @State private var bannerColor: Color = .gray
     @State private var httpStatus: Int?
@@ -247,8 +227,29 @@ struct Responder: View {
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                         }
                     } else if apiPathVm.selectedRoute == .invoice {
-                        TextField("invoice id (integer)", text: $invoiceId)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
+
+                        VStack {
+                            HStack {
+                                ThrowingEscapableButton(
+                                    type: .load,
+                                    title: "Get data",
+                                    action: invoiceVm.getCurrentInvoiceRender
+                                )
+                                
+                                ThrowingEscapableButton(
+                                    type: .load,
+                                    title: "Render invoice",
+                                    action: invoiceVm.renderDataFromInvoiceId
+                                )
+
+                            }
+
+                        MailerAPIInvoiceVariablesView(viewModel: invoiceVm)
+
+                        // TextField("invoice id (integer)", text: $invoiceId)
+                        //     .textFieldStyle(RoundedBorderTextFieldStyle())
+                        }
+
                     } else {
                         TextField("Client (variable: \"{{name}}\"", text: $client)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -456,7 +457,7 @@ struct Responder: View {
         if includeQuoteInCustomMessage {
             includeQuoteInCustomMessage = false
         }
-        invoiceId = ""
+        // invoiceId = ""
     }
     
     private func sendMailerEmail() throws {
@@ -581,6 +582,7 @@ struct Responder: View {
         number = ""
         selectedContact = nil
     }
+
 }
 
 struct StateVariables {
@@ -686,3 +688,4 @@ func executeMailer(_ arguments: String) throws {
         throw error
     }
 }
+

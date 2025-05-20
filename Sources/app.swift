@@ -1,12 +1,25 @@
 import SwiftUI
+import plate
 
 @main
 struct ResponderApp: App {
+    // @StateObject private var mailerViewModel: MailerViewModel
+    // @StateObject private var variableStore: VariableStore
+    // @StateObject private var invoiceVm: MailerAPIInvoiceVariablesViewModel
+
+    @StateObject private var mailerViewModel = MailerViewModel()
+    @StateObject private var invoiceVm = MailerAPIInvoiceVariablesViewModel()
+
     init() {
+        // _mailerViewModel = StateObject(wrappedValue: MailerViewModel())
+
+        // let vs = VariableStore()
+        // _variableStore   = StateObject(wrappedValue: vs)
+        // _invoiceVm       = StateObject(wrappedValue: MailerAPIInvoiceVariablesViewModel(store: vs))
+
         NSWindow.allowsAutomaticWindowTabbing = false
     }
 
-    @StateObject private var mailerViewModel = MailerViewModel()
     @State private var selectedTab: Int = 0
 
     var body: some Scene {
@@ -14,6 +27,7 @@ struct ResponderApp: App {
             TabView(selection: $selectedTab) {
                 Responder()
                   .environmentObject(mailerViewModel)
+                  .environmentObject(invoiceVm)
                   .tabItem {
                     Label("Responder", systemImage: "paperplane.fill")
                   }
