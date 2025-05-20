@@ -8,7 +8,6 @@ struct TemplateFetchResponse: Decodable {
     let html: String
 }
 
-
 struct Responder: View {
     @EnvironmentObject var vm: MailerViewModel
     @EnvironmentObject var invoiceVm: MailerAPIInvoiceVariablesViewModel
@@ -46,10 +45,6 @@ struct Responder: View {
         return finalHtml.range(of: pattern, options: .regularExpression) != nil
     }
 
-    private var contactExtractionError: Bool {
-        return (client == "ERR" || dog == "ERR")
-    }
-
     private var emptySubjectWarning: Bool {
         return subject.isEmpty
     }
@@ -64,7 +59,7 @@ struct Responder: View {
             return false
         // if custom/.., check the html body for raw variables
         } else if (apiPathVm.selectedRoute == .custom) {
-            return (finalHtmlContainsRawVariables || contactExtractionError || emptySubjectWarning || emptyEmailWarning)
+            return (finalHtmlContainsRawVariables || emptySubjectWarning || emptyEmailWarning)
         // otherwise, check for parsing errs in client / dog names in primary templates
         } else {
             return false
