@@ -17,45 +17,6 @@ let htmlDoc = """
 </html>
 """
 
-// enum MailerCategory: String, RawRepresentable, CaseIterable {
-//     // case none
-//     case quote // issue, follow
-//     case lead // confirmation, follow
-//     case affiliate // enum??
-//     // case onboarding // pre-training
-//     case service // follow
-//     case invoice
-//     case resolution
-//     case custom
-//     case template
-// }
-
-// extension MailerCategory {
-//     var filesRequiringAvailability: Set<MailerFile> {
-//         switch self {
-//             case .lead:       return [.confirmation, .check, .follow]
-//             case .service:    return [.follow]
-//             default:          return []
-//         }
-//     }
-// }
-
-// enum MailerFile: String, RawRepresentable, CaseIterable {
-//     // case none
-//     case confirmation
-//     case issue 
-//     case follow
-//     case expired 
-//     // case preTraining
-//     case onboarding
-//     case review
-//     case check
-//     case food
-//     case template
-//     case message
-//     case fetch
-// }
-
 extension String {
     /// Returns the first capture‐group for `pattern`, or nil.
     func firstCapturedGroup(
@@ -104,49 +65,6 @@ struct Responder: View {
 
     @State private var invoiceId = ""
 
-    // private let mailerCategories = MailerCategory.allCases
-    // private let mailerFiles = MailerFile.allCases
-
-//     @State private var selectedCategory: MailerCategory? = nil
-//     @State private var selectedFile: MailerFile? = nil
-
-//     private let validFilesForCategory: [MailerCategory: [MailerFile]] = [
-//         .quote: [.issue, .follow],  // No confirmation for quotes
-//         .lead: [.confirmation, .check, .follow], 
-//         .affiliate: [.food],  // No valid files for affiliate (empty array)
-//         // .onboarding: [.preTraining], 
-//         .service: [.follow, .onboarding], 
-//         .invoice: [.issue, .expired],
-//         .resolution: [.review],
-//         .custom: [.message],
-//         .template: [.fetch]
-//     ]
-
-//     private var availableFiles: [MailerFile] {
-//         guard let category = selectedCategory else { return [] }
-//         return validFilesForCategory[category] ?? []
-//     }
-
-//     private func isFileDisabled(_ file: MailerFile) -> Bool {
-//         guard
-//           let category = selectedCategory,
-//           let allowed  = validFilesForCategory[category]
-//         else { return true }   // disable everything if no category
-//         return !allowed.contains(file)
-//     }
-
-//     private var disabledFileSelected: Bool {
-//         selectedFile.map { isFileDisabled($0) } ?? false
-//     }
-
-//     private var needsAvailability: Bool {
-//         guard
-//           let category = selectedCategory,
-//           let file     = selectedFile
-//         else { return false }
-//         return category.filesRequiringAvailability.contains(file)
-//     }
-
     @StateObject private var weeklyScheduleVm = WeeklyScheduleViewModel()
     @StateObject private var contactsVm = ContactsListViewModel()
     @StateObject private var apiPathVm = MailerAPISelectionViewModel()
@@ -162,14 +80,6 @@ struct Responder: View {
         else { return nil }
         return json
     }
-
-    // var isCustomCategorySelected: Bool {
-    //     return (selectedCategory == .custom)
-    // }
-
-    // var isTemplateCategorySelected: Bool {
-    //     return (selectedCategory == .custom)
-    // }
 
     var finalSubject: String {
         return replaceTemplateVariables(subject)
@@ -205,12 +115,7 @@ struct Responder: View {
             return (finalHtmlContainsRawVariables || contactExtractionError || emptySubjectWarning || emptyEmailWarning)
         // otherwise, check for parsing errs in client / dog names in primary templates
         } else {
-            // if contactExtractionError {
-            //     return true
-            // // if all that clears, do not raise invalid marker
-            // } else {
-                return false
-            // }
+            return false
         }
     }
 
@@ -504,6 +409,7 @@ struct Responder: View {
                         StandardEscapableButton(
                             type: .execute, 
                             title: "Run mailer", 
+                            cancelTitle: "Cancel running mailer", 
                             subtitle: "Starts mailer background process"
                         ) {
                             do {
