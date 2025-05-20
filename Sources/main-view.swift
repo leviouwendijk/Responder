@@ -284,6 +284,7 @@ struct Responder: View {
                         .frame(maxWidth: 350)
                     }
                 }
+                .frame(minHeight: 600)
                 .padding()
             }
             .frame(width: 400)
@@ -379,7 +380,7 @@ struct Responder: View {
                         StandardEscapableButton(
                             type: .execute, 
                             title: "Run mailer", 
-                            cancelTitle: "Cancel running mailer", 
+                            cancelTitle: "Do not run mailer yet", 
                             subtitle: "Starts mailer background process"
                         ) {
                             do {
