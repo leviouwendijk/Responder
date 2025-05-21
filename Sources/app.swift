@@ -49,7 +49,7 @@ struct ResponderApp: App {
                 BuildInformation(
                     specification: buildSpecification,
                     alignment: .center,
-                    display: [.version]
+                    display: [.version, .versionPrefix]
                 )
             }
         }
