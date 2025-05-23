@@ -63,7 +63,6 @@ struct ResponderApp: App {
                     ],
                     prefixStyle: .long
                 )
-
             }
         }
     }
