@@ -71,7 +71,8 @@ struct ResponderApp: App {
                     // specification: buildSpecification,
                     alignment: .center,
                     display: [
-                        [.version, .versionPrefix],
+                        [.version],
+                        [.latestVersion],
                         [.name],
                         [.author]
                     ],
