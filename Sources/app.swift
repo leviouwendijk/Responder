@@ -7,7 +7,7 @@ struct ResponderApp: App {
     @StateObject private var invoiceVm = MailerAPIInvoiceVariablesViewModel()
 
     let buildSpecification = BuildSpecification(
-      version: BuildVersion(major: 2, minor: 4, patch: 0),
+      version: BuildVersion(major: 2, minor: 4, patch: 1),
       name: "Responder",
       author: "Levi Ouwendijk",
       description: ""
