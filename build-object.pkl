@@ -8,3 +8,4 @@ version = {
 }
 details = "Interface for custom mailer API"
 author = "Levi Ouwendijk"
+update = "https://raw.githubusercontent.com/leviouwendijk/Responder/refs/heads/master/build-object.pkl"
