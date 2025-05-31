@@ -3,8 +3,8 @@ name = "Responder"
 type = "application"
 version {
     major = 2
-    minor = 6
-    patch = 6
+    minor = 7
+    patch = 0
 }
 details = "Interface for custom mailer API"
 author = "Levi Ouwendijk"

@@ -3,6 +3,7 @@ import SwiftUI
 import plate
 
 struct MessageMakerView: View {
+    @EnvironmentObject var vm: MailerViewModel
     @State private var messageMakerTemplate = ""
     @State private var msgMessage = ""
 
@@ -14,7 +15,7 @@ struct MessageMakerView: View {
     @State private var alertMessage = ""
 
     var body: some View {
-        HStack {
+        VStack {
             VStack {
                 TextField("client", text: $client)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -103,34 +104,31 @@ struct MessageMakerView: View {
 }
 
 func executeMessageMaker(_ arguments: String) throws -> String {
-    do {
-        let home = Home.string()
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/zsh") // Use Zsh directly
-        process.arguments = ["-c", "source ~/dotfiles/.vars.zsh && \(home)/sbm-bin/msg \(arguments)"]
-        
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
-        process.standardOutput = outputPipe
-        process.standardError = errorPipe
+    let home = Home.string()
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/zsh") // Use Zsh directly
+    process.arguments = ["-c", "source ~/dotfiles/.vars.zsh && \(home)/sbm-bin/msg \(arguments)"]
+    
+    let outputPipe = Pipe()
+    let errorPipe = Pipe()
+    process.standardOutput = outputPipe
+    process.standardError = errorPipe
 
-        try process.run()
-        process.waitUntilExit()
+    try process.run()
+    process.waitUntilExit()
 
-        let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-        let outputString = String(data: outputData, encoding: .utf8) ?? ""
-        let errorString = String(data: errorData, encoding: .utf8) ?? ""
+    let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+    let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+    let outputString = String(data: outputData, encoding: .utf8) ?? ""
+    let errorString = String(data: errorData, encoding: .utf8) ?? ""
 
-        if process.terminationStatus == 0 {
-            print("msg executed successfully:\n\(outputString)")
-            return outputString
-        } else {
-            print("Error running msg:\n\(errorString)")
-            throw NSError(domain: "msg", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: errorString])
-        }
-    } catch {
-        print("Error running commands: \(error)")
-        throw error
+    if process.terminationStatus == 0 {
+        // print("msg executed successfully:\n\(outputString)")
+        return outputString
+    } else {
+        print("Error running msg:\n\(errorString)")
+        throw NSError(domain: "msg", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: errorString])
     }
 }
+
+

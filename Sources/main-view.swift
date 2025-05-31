@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import Contacts
 import EventKit
@@ -33,16 +34,29 @@ struct Responder: View {
     @State private var local = false
 
     var finalSubject: String {
-        return replaceTemplateVariables(subject)
+        return subject
+            .replaceClientDogTemplatePlaceholders(client: client, dog: dog)
     }
 
     var finalHtml: String {
-        return replaceTemplateVariables(fetchedHtml.htmlClean())
+        return fetchedHtml.htmlClean()
+            .replaceClientDogTemplatePlaceholders(client: client, dog: dog)
     }
 
     private var finalHtmlContainsRawVariables: Bool {
-        let pattern = #"\{\{\s*(?!IMAGE_WIDTH\b)[^}]+\s*\}\}"#
-        return finalHtml.range(of: pattern, options: .regularExpression) != nil
+        // let pattern = #"\{\{\s*(?!IMAGE_WIDTH\b)[^}]+\s*\}\}"#
+        // return finalHtml.range(of: pattern, options: .regularExpression) != nil
+        let ignorances = ["IMAGE_WIDTH"]
+        return finalHtml.containsRawTemplatePlaceholderSyntaxes(ignoring: ignorances)
+    }
+
+    private var selectedWAMessageReplaced: String {
+        return selectedWAMessage.replaced(client: client, dog: dog)
+    }
+
+    private var waMessageContainsRawPlaceholders: Bool {
+        return selectedWAMessageReplaced
+            .containsRawTemplatePlaceholderSyntaxes()
     }
 
     private var emptySubjectWarning: Bool {
@@ -129,6 +143,12 @@ struct Responder: View {
     @State private var includeQuoteInCustomMessage = false
     @State private var showErrorPane = false
 
+    @State private var selectedWAMessage: WAMessageTemplate = .called
+
+    @State private var showWAMessageNotification: Bool = false
+    @State private var waMessageNotificationStyle: NotificationBannerType = .info
+    @State private var waMessageNotificationContents: String = ""
+
     var body: some View {
         HStack {
             MailerAPIPathSelectionView(viewModel: apiPathVm)
@@ -171,6 +191,12 @@ struct Responder: View {
                                     street   = addr.street
                                     areaCode = addr.postalCode
                                 }
+
+                                // extra clearance logic, wa related:
+                                if !selectedWAMessageReplaced.containsRawTemplatePlaceholderSyntaxes() {
+                                    showWAMessageNotification = false
+                                }
+
                             },
                             onDeselect: {
                                 clearContact()
@@ -260,28 +286,85 @@ struct Responder: View {
                         ))
                         .textFieldStyle(RoundedBorderTextFieldStyle())
 
-                        HStack {
-                            StandardButton(
-                                type: .clear, 
-                                title: "Clear contact", 
-                                subtitle: "clears contact fields"
-                            ) {
-                                clearContact()
+                        VStack {
+                            HStack {
+                                StandardButton(
+                                    type: .clear, 
+                                    title: "Clear contact", 
+                                    subtitle: "clears contact fields"
+                                ) {
+                                    clearContact()
+                                }
+
+                                Spacer()
                             }
+                            .frame(maxWidth: 350)
 
-                            Spacer()
+                            VStack {
+                                HStack {
+                                    Picker("msg", selection: $selectedWAMessage) {
+                                        ForEach(WAMessageTemplate.allCases, id: \.self) { template in
+                                            HStack {
+                                                VStack(alignment: .leading) {
+                                                    Text(template.rawValue)
+                                                    Text(template.subtitle)
+                                                        .font(.caption)
+                                                        .foregroundColor(.secondary)
+                                                }
+                                            }
+                                            .tag(template)
+                                        }
+                                    }
+                                    .pickerStyle(MenuPickerStyle())
 
-                            if apiPathVm.selectedRoute == .custom {
-                                StandardToggle(
-                                    style: .switch,
-                                    isOn: $includeQuoteInCustomMessage,
-                                    title: "Include quote",
-                                    subtitle: nil,
-                                    width: 150
-                                )
+
+                                    StandardButton(
+                                        type: .execute, 
+                                        title: "WA message", 
+                                        subtitle: ""
+                                    ) {
+                                        if !waMessageContainsRawPlaceholders {
+                                            withAnimation {
+                                                showWAMessageNotification = false
+                                            }
+
+                                            selectedWAMessageReplaced
+                                                .clipboard()
+
+                                            waMessageNotificationContents = "WA message copied"
+                                            waMessageNotificationStyle = .success
+                                            withAnimation {
+                                                showWAMessageNotification = true
+                                            }
+
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                                withAnimation { 
+                                                    showWAMessageNotification = false 
+                                                }
+                                            }
+                                        } else {
+                                            waMessageNotificationStyle = .error
+                                            waMessageNotificationContents = "WA message contains raw placeholders"
+                                            withAnimation {
+                                                showWAMessageNotification = true
+                                            }
+                                        }
+                                    }
+
+                                    Spacer()
+                                }
+                                .frame(maxWidth: 350)
+
+                                // if showWAMessageNotification {
+                                    NotificationBanner(
+                                        type: waMessageNotificationStyle,
+                                        message: waMessageNotificationContents
+                                    )
+                                    .zIndex(2)
+                                    .hide(when: !showWAMessageNotification)
+                                // }
                             }
                         }
-                        .frame(maxWidth: 350)
                     }
                 }
                 .frame(minHeight: 600)
@@ -316,14 +399,27 @@ struct Responder: View {
                             )
                         }
 
-                        StandardButton(
-                            type: .clear, 
-                            title: "Clear HTML", 
-                            subtitle: "clears fetched html"
-                        ) {
-                            fetchedHtml = ""
-                        }
+                        HStack {
+                            StandardButton(
+                                type: .clear, 
+                                title: "Clear HTML", 
+                                subtitle: "clears fetched html"
+                            ) {
+                                fetchedHtml = ""
+                            }
 
+                            Spacer()
+
+                            if apiPathVm.selectedRoute == .custom {
+                                StandardToggle(
+                                    style: .switch,
+                                    isOn: $includeQuoteInCustomMessage,
+                                    title: "Include quote",
+                                    subtitle: nil,
+                                    width: 150
+                                )
+                            }
+                        }
                         .padding()
                     }
                     .padding()
@@ -409,14 +505,6 @@ struct Responder: View {
                 dismissButton: .default(Text("OK"))
             )
         }
-    }
-
-    func replaceTemplateVariables(_ string: String) -> String {
-        return string
-            .replacingOccurrences(of: "{{name}}", with: (client.isEmpty ? "{{name}}" : client))
-            .replacingOccurrences(of: "{{client}}", with: (client.isEmpty ? "{{client}}" : client))
-            .replacingOccurrences(of: "{{dog}}", with: (dog.isEmpty ? "{{dog}}" : dog))
-            // .replacingOccurrences(of: "{{email}}", with: email)
     }
 
     private func cleanThisView() {
