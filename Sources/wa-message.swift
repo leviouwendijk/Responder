@@ -71,7 +71,7 @@ struct WAMessageDropdown: View {
             .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.secondary.opacity(0.8), lineWidth: 4)
+                    .stroke(Color.secondary.opacity(0.6), lineWidth: 2)
             )
 
             if isExpanded {
@@ -177,7 +177,7 @@ enum WAMessageTemplate: String, Hashable, CaseIterable {
 
             We hebben een aantal pogingen gedaan om je te bereiken over {dog}, maar helaas zonder succes. 
 
-            Heb jij onze hulp nog nodig voor {dog}?
+            Heb je onze hulp nog nodig voor {dog}?
 
             —Casper | Hondenmeesters
             """
@@ -186,7 +186,7 @@ enum WAMessageTemplate: String, Hashable, CaseIterable {
             return """
             Hey {client},
 
-            We hebben je al even niet van je gehoord. 
+            We hebben al even niet van je gehoord. 
 
             Heb je nog hulp nodig voor {dog}?
 

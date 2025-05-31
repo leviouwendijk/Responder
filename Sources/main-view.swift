@@ -305,18 +305,7 @@ struct Responder: View {
                                 Divider()
 
                                 HStack {
-
-                                    // WAMessageMenuPicker(selected: $selectedWAMessage)
                                     WAMessageDropdown(selected: $selectedWAMessage)
-
-                                    // Picker(selection: $selectedWAMessage, label: Text("")) {
-                                    //     ForEach(WAMessageTemplate.allCases, id: \.self) { template in
-                                    //         WAMessageRow(template: template)
-                                    //             .tag(template)
-                                    //     }
-                                    // }
-                                    // .pickerStyle(MenuPickerStyle())
-
 
                                     StandardButton(
                                         type: .execute, 
