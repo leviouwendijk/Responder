@@ -42,7 +42,7 @@ struct WAMessageDropdown: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             Button(action: {
-                withAnimation {
+                withAnimation(.easeInOut(duration: 0.2)) {
                     isExpanded.toggle()
                 }
             }) {
@@ -80,7 +80,7 @@ struct WAMessageDropdown: View {
                         VStack(spacing: 0) {
                             ForEach(WAMessageTemplate.allCases, id: \.self) { template in
                                 Button(action: {
-                                    withAnimation {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
                                         selected = template
                                         isExpanded = false
                                     }
