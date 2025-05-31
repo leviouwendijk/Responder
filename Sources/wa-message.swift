@@ -86,8 +86,20 @@ struct WAMessageDropdown: View {
                                     }
                                 }) {
                                     WAMessageRow(template: template)
+                                    // VStack(alignment: .leading, spacing: 2) {
+                                    //     Text(template.title)
+                                    //         .lineLimit(1)
+                                    //         .truncationMode(.tail)
+
+                                    //     Text(template.subtitle)
+                                    //         .font(.caption)
+                                    //         .foregroundColor(.secondary)
+                                    //         .lineLimit(1)
+                                    //         .truncationMode(.tail)
+                                    // }
                                 }
                                 .padding(.vertical, 2)
+                                .disabled((template == selected))
                             }
                         }
                     }
