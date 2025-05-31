@@ -1,5 +1,25 @@
 import Foundation
 import plate
+import SwiftUI 
+
+struct WAMessageRow: View {
+    let template: WAMessageTemplate
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(template.rawValue)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Text(template.subtitle)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .frame(maxWidth: 200, alignment: .leading)
+    }
+}
 
 enum WAMessageTemplate: String, Hashable, CaseIterable {
     case called

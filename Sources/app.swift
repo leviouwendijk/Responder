@@ -45,19 +45,19 @@ struct ResponderApp: App {
                       }
                       .tag(0)
 
-                    MessageMakerView()
-                      .environmentObject(mailerViewModel)
-                      .tabItem {
-                        Label("WA", systemImage: "message.fill")
-                      }
-                      .tag(1)
+                    // MessageMakerView()
+                    //   .environmentObject(mailerViewModel)
+                    //   .tabItem {
+                    //     Label("WA", systemImage: "message.fill")
+                    //   }
+                    //   .tag(1)
 
                     MailerStandardOutput()
                       .environmentObject(mailerViewModel)
                       .tabItem {
                         Label("stdout", systemImage: "terminal.fill")
                       }
-                      .tag(2)
+                      .tag(1)
                 }
 
                 // BuildInformation(

@@ -302,17 +302,10 @@ struct Responder: View {
 
                             VStack {
                                 HStack {
-                                    Picker("msg", selection: $selectedWAMessage) {
+                                    Picker(selection: $selectedWAMessage, label: Text("WA:")) {
                                         ForEach(WAMessageTemplate.allCases, id: \.self) { template in
-                                            HStack {
-                                                VStack(alignment: .leading) {
-                                                    Text(template.rawValue)
-                                                    Text(template.subtitle)
-                                                        .font(.caption)
-                                                        .foregroundColor(.secondary)
-                                                }
-                                            }
-                                            .tag(template)
+                                            WAMessageRow(template: template)
+                                                .tag(template)
                                         }
                                     }
                                     .pickerStyle(MenuPickerStyle())
@@ -350,6 +343,7 @@ struct Responder: View {
                                             }
                                         }
                                     }
+                                    .disabled(selectedWAMessageReplaced.containsRawTemplatePlaceholderSyntaxes())
 
                                     Spacer()
                                 }
