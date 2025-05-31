@@ -165,11 +165,11 @@ enum WAMessageTemplate: String, Hashable, CaseIterable {
             return """
             Hey {client},
 
-            We hebben geprobeerd je te bellen over {dog} naar aanleiding van je bericht.
+            Ik heb je gebeld vanwege je bericht over {dog}.
 
-            Heb je onze hulp nodig? Bel ons even, dan kijken we of je hierbij kunnen helpen.
+            Wil je weten of wij je kunnen helpen met het gedrag van {dog}? Daarvoor kom ik graag meer te weten over jouw stiuatie.
             
-            Je kan mij bereiken op dit nummer (+316 23 62 13 90).
+            Je kan me terugbellen op dit nummer (+316 23 62 13 90).
 
             —Casper | Hondenmeesters
             """
@@ -178,9 +178,9 @@ enum WAMessageTemplate: String, Hashable, CaseIterable {
             return """
             Hey {client},
 
-            We hebben je geprobeerd te bellen, maar kregen helaas geen gehoor. 
+            Ik heb je gebeld, maar kon je niet bereiken. 
 
-            Heb je nog hulp nodig met {dog}?
+            Heb je geen hulp meer nodig voor {dog}?
 
             —Casper | Hondenmeesters
             """
@@ -189,9 +189,9 @@ enum WAMessageTemplate: String, Hashable, CaseIterable {
             return """
             Hey {client},
 
-            We hebben een aantal pogingen gedaan om je te bereiken over {dog}, maar helaas zonder succes. 
+            Ik heb je enkele keren gebeld, maar kon je daarmee niet bereiken.
 
-            Heb je onze hulp nog nodig voor {dog}?
+            Heb je geen hulp meer nodig met het gedrag van {dog}?
 
             —Casper | Hondenmeesters
             """
@@ -202,7 +202,7 @@ enum WAMessageTemplate: String, Hashable, CaseIterable {
 
             We hebben al even niet van je gehoord. 
 
-            Heb je nog hulp nodig voor {dog}?
+            Heb je geen hulp meer nodig voor {dog}?
 
             —Casper | Hondenmeesters
             """
