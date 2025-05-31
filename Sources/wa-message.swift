@@ -156,6 +156,8 @@ enum WAMessageTemplate: String, Hashable, CaseIterable {
             We hebben geprobeerd je te bellen over {dog} naar aanleiding van je bericht.
 
             Heb je onze hulp nodig? Bel ons even, dan kijken we of je hierbij kunnen helpen.
+            
+            Je kan mij bereiken op dit nummer (+316 23 62 13 90).
 
             —Casper | Hondenmeesters
             """
