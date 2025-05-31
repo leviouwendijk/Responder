@@ -301,14 +301,21 @@ struct Responder: View {
                             .frame(maxWidth: 350)
 
                             VStack {
+                                // SectionTitle(title: "WhatsApp Message")
+                                Divider()
+
                                 HStack {
-                                    Picker(selection: $selectedWAMessage, label: Text("WA:")) {
-                                        ForEach(WAMessageTemplate.allCases, id: \.self) { template in
-                                            WAMessageRow(template: template)
-                                                .tag(template)
-                                        }
-                                    }
-                                    .pickerStyle(MenuPickerStyle())
+
+                                    // WAMessageMenuPicker(selected: $selectedWAMessage)
+                                    WAMessageDropdown(selected: $selectedWAMessage)
+
+                                    // Picker(selection: $selectedWAMessage, label: Text("")) {
+                                    //     ForEach(WAMessageTemplate.allCases, id: \.self) { template in
+                                    //         WAMessageRow(template: template)
+                                    //             .tag(template)
+                                    //     }
+                                    // }
+                                    // .pickerStyle(MenuPickerStyle())
 
 
                                     StandardButton(
