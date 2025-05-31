@@ -165,11 +165,11 @@ enum WAMessageTemplate: String, Hashable, CaseIterable {
             return """
             Hey {client},
 
-            Ik heb je gebeld vanwege je bericht over {dog}.
+            Ik heb je gebeld, maar kon je niet bereiken. 
 
-            Wil je weten of wij je kunnen helpen met het gedrag van {dog}? Daarvoor kom ik graag meer te weten over jouw stiuatie.
+            Wil je weten of wij je kunnen helpen met het gedrag van {dog}? Bel mij dan even terug.
             
-            Je kan me terugbellen op dit nummer (+316 23 62 13 90).
+            Je kan me bereiken op dit nummer (+316 23 62 13 90).
 
             —Casper | Hondenmeesters
             """
