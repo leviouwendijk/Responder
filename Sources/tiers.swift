@@ -133,7 +133,9 @@ private struct TableBlock: View {
                     // 2) For each tier, show that tier’s matching value
                     ForEach(tiers, id: \.tier) { content in
                         let entry = valuesFor(content)[rowIndex]
-                        Text(String(format: "%.2f", entry.1))
+                        let str = String(format: "%.2f", entry.1)
+                        let displayed = (entry.0 == "prognosis") ? "(\(str))" : str
+                        Text(displayed)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .foregroundStyle(textColor)
                     }
