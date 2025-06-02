@@ -18,17 +18,6 @@ struct ResponderApp: App {
     init() {
         NSWindow.allowsAutomaticWindowTabbing = false
 
-        // do {
-        //     buildSpecification = try BuildSpecification(fromPkl: URL(fileURLWithPath: "build-object.pkl"))
-        // } catch {
-        //     print("Failed to load PKL, using default:", error)
-        //     buildSpecification = BuildSpecification(
-        //         version: BuildVersion(major: 2, minor: 4, patch: 1),
-        //         name: "Responder",
-        //         author: "Levi Ouwendijk",
-        //         description: ""
-        //     )
-        // }
     }
 
     @State private var selectedTab: Int = 0

@@ -153,6 +153,10 @@ struct Responder: View {
     @State private var showWAMessageNotification: Bool = false
     @State private var waMessageNotificationStyle: NotificationBannerType = .info
     @State private var waMessageNotificationContents: String = ""
+    
+    @State private var showRenderPdfNotification: Bool = false
+    @State private var renderPdfNotificationStyle: NotificationBannerType = .info
+    @State private var renderPdfNotificationContents: String = ""
 
     // @State private var base: String = "350"
     // @State private var kilometers: String = ""
@@ -553,18 +557,57 @@ struct Responder: View {
                             QuotaTierListView(quota: quota)
                                 .padding(.top, 16)
 
-                            StandardButton(
-                                type: .execute,
-                                title: "Render PDF",
-                                action: {
-                                    do {
-                                        try render(quota: quota)
-                                    } catch {
-                                        print(error)
+                            HStack {
+                                StandardButton(
+                                    type: .execute,
+                                    title: "Render PDF",
+                                    action: {
+                                        do {
+                                            withAnimation {
+                                                showRenderPdfNotification = false
+                                            }
+
+                                            try render(quota: quota)
+
+                                            renderPdfNotificationContents = "quota pdf rendered"
+                                            renderPdfNotificationStyle = .success
+                                            withAnimation {
+                                                showRenderPdfNotification = true
+                                            }
+
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                                withAnimation { 
+                                                    showRenderPdfNotification = false 
+                                                }
+                                            }
+                                        } catch {
+                                            withAnimation {
+                                                showRenderPdfNotification = false
+                                            }
+
+                                            renderPdfNotificationContents = "render failed: \(error)"
+                                            renderPdfNotificationStyle = .error
+                                            withAnimation {
+                                                showRenderPdfNotification = true
+                                            }
+
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                                withAnimation { 
+                                                    showRenderPdfNotification = false 
+                                                }
+                                            }
+                                        }
                                     }
-                                }
-                            )
-                            .padding(.top, 8)
+                                )
+                                .disabled((quotaVm.loadedQuota == nil))
+                                .padding(.top, 8)
+
+                                NotificationBanner(
+                                    type: renderPdfNotificationStyle,
+                                    message: renderPdfNotificationContents
+                                )
+                                .hide(when: !showRenderPdfNotification)
+                            }
                         }
                         else {
                             NotificationBanner(
