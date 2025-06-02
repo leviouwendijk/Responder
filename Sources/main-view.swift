@@ -459,38 +459,37 @@ struct Responder: View {
                         // 1) “Kilometers” field
                         StandardTextField(
                             "kilometers",
-                            text: $kilometers,
+                            text: Binding<String>(
+                                get:  { quotaVm.customQuotaInputs.travelCost.kilometers },
+                                set:  { newValue in
+                                    quotaVm.customQuotaInputs.travelCost.kilometers = newValue
+                                }
+                            ),
                             placeholder: "45"
                         )
-                        .onSubmit {
-                            convertQuotaInputs()
-                        }
 
                         // 2) Prognosis / Local
                         HStack {
                             StandardTextField(
                                 "prognosis",
                                 text: Binding<String>(
-                                    get:  { prognosis.0 },
-                                    set:  { prognosis.0 = $0 }
+                                    get:  { quotaVm.customQuotaInputs.prognosis.count },
+                                    set:  { newValue in
+                                        quotaVm.customQuotaInputs.prognosis.count = newValue
+                                    }
                                 ),
                                 placeholder: "5"
                             )
-                            .onSubmit {
-                                convertQuotaInputs()
-                            }
-
                             StandardTextField(
                                 "local",
                                 text: Binding<String>(
-                                    get:  { prognosis.1 },
-                                    set:  { prognosis.1 = $0 }
+                                    get:  { quotaVm.customQuotaInputs.prognosis.local },
+                                    set:  { newValue in
+                                        quotaVm.customQuotaInputs.prognosis.local = newValue
+                                    }
                                 ),
                                 placeholder: "4"
                             )
-                            .onSubmit {
-                                convertQuotaInputs()
-                            }
                         }
 
                         // 3) Suggestion / Local
@@ -498,86 +497,82 @@ struct Responder: View {
                             StandardTextField(
                                 "suggestion",
                                 text: Binding<String>(
-                                    get:  { suggestion.0 },
-                                    set:  { suggestion.0 = $0 }
+                                    get:  { quotaVm.customQuotaInputs.suggestion.count },
+                                    set:  { newValue in
+                                        quotaVm.customQuotaInputs.suggestion.count = newValue
+                                    }
                                 ),
                                 placeholder: "3"
                             )
-                            .onSubmit {
-                                convertQuotaInputs()
-                            }
-
                             StandardTextField(
                                 "local",
                                 text: Binding<String>(
-                                    get:  { suggestion.1 },
-                                    set:  { suggestion.1 = $0 }
+                                    get:  { quotaVm.customQuotaInputs.suggestion.local },
+                                    set:  { newValue in
+                                        quotaVm.customQuotaInputs.suggestion.local = newValue
+                                    }
                                 ),
                                 placeholder: "2"
                             )
-                            .onSubmit {
-                                convertQuotaInputs()
-                            }
                         }
 
                         // 4) Base
                         StandardTextField(
                             "base",
-                            text: $base,
+                            text: Binding<String>(
+                                get:  { quotaVm.customQuotaInputs.base },
+                                set:  { newValue in
+                                    quotaVm.customQuotaInputs.base = newValue
+                                }
+                            ),
                             placeholder: "350"
                         )
-                        .onSubmit {
-                            convertQuotaInputs()
-                        }
 
-                        // 5) Travel‐cost fields
+                        // 5) Travel‐cost fields (if you want them visible here)
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Travel Cost Inputs").bold()
-
                             HStack {
-                                // (b) Speed
                                 StandardTextField(
                                     "speed",
-                                    text: $speed,
-                                    placeholder: "80"
+                                    text: Binding<String>(
+                                        get:  { quotaVm.customQuotaInputs.travelCost.speed },
+                                        set:  { newValue in
+                                            quotaVm.customQuotaInputs.travelCost.speed = newValue
+                                        }
+                                    ),
+                                    placeholder: "80.0"
                                 )
-                                .onSubmit {
-                                    convertQuotaInputs()
-                                }
-
-                                // (c) Rate/travel
                                 StandardTextField(
                                     "rate/travel",
-                                    text: $travelRate,
+                                    text: Binding<String>(
+                                        get:  { quotaVm.customQuotaInputs.travelCost.rates.travel },
+                                        set:  { newValue in
+                                            quotaVm.customQuotaInputs.travelCost.rates = TravelCostRatesInputs(
+                                                travel: newValue,
+                                                time: quotaVm.customQuotaInputs.travelCost.rates.time
+                                            )
+                                        }
+                                    ),
                                     placeholder: "0.25"
                                 )
-                                .onSubmit {
-                                    convertQuotaInputs()
-                                }
-
-                                // (d) Rate/time
                                 StandardTextField(
                                     "rate/time",
-                                    text: $timeRate,
+                                    text: Binding<String>(
+                                        get:  { quotaVm.customQuotaInputs.travelCost.rates.time },
+                                        set:  { newValue in
+                                            quotaVm.customQuotaInputs.travelCost.rates = TravelCostRatesInputs(
+                                                travel: quotaVm.customQuotaInputs.travelCost.rates.travel,
+                                                time: newValue
+                                            )
+                                        }
+                                    ),
                                     placeholder: "105"
                                 )
-                                .onSubmit {
-                                    convertQuotaInputs()
-                                }
                             }
                         }
                         .padding(.top, 8)
 
-                        StandardButton(
-                            type: .execute,
-                            title: "Compute quota",
-                            subtitle: ""
-                        ) {
-                            convertQuotaInputs()
-                        }
-                        .padding(.top, 8)
-
-                        // 7) Show spinner / table / “enter values”
+                        // 6) Decide what to show:
                         if quotaVm.isLoading {
                             ProgressView("Computing quota…")
                                 .padding(.top, 16)
@@ -602,7 +597,7 @@ struct Responder: View {
                         else {
                             NotificationBanner(
                                 type: .info,
-                                message: "Hit Return or tap Recompute above"
+                                message: "Enter quote values above"
                             )
                             .padding(.top, 16)
                         }
@@ -821,33 +816,6 @@ struct Responder: View {
         selectedContact = nil
     }
 
-    private func convertQuotaInputs() {
-        let inputs = CustomQuotaInputs(
-            base: base,
-            prognosis: SessionCountEstimationInputs(
-                type: .prognosis,
-                count: prognosis.0,
-                local: prognosis.1
-            ),
-            suggestion: SessionCountEstimationInputs(
-                type: .suggestion,
-                count: suggestion.0,
-                local: suggestion.1
-            ),
-            travelCost: TravelCostInputs(
-                kilometers: kilometers,
-                speed: speed,
-                rates: TravelCostRatesInputs(
-                    travel: travelRate,
-                    time: timeRate
-                ),
-                roundTrip: true
-            )
-        )
-
-        quotaVm.customQuotaInputs = inputs
-        // quotaVm.compute()
-    }
 }
 
 struct StateVariables {
