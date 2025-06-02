@@ -692,9 +692,16 @@ struct Responder: View {
                             anyInvalidConditionsCheck || 
                             apiPathVm.routeOrEndpointIsNil()
                         )
-
                     }
                     .padding(.top, 10)
+
+                    HStack {
+                        NotificationBanner(
+                            type: .warning,
+                            message: "No endpoint selected"
+                        )
+                        .hide(when: !apiPathVm.routeOrEndpointIsNil())
+                    }
                 }
             }
             .frame(minWidth: 500)
