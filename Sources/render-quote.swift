@@ -2,26 +2,6 @@ import Foundation
 import plate
 import Economics
 
-// func quota(
-//     kilometers: Double,
-//     prognosis: (Int, Int),
-//     suggestion: (Int, Int),
-//     base: Double
-// ) throws -> CustomQuota {
-//     let travelCost = TravelCost(kilometers: kilometers)
-//     let prog = try SessionCountEstimationObject(type: .prognosis, count: prognosis.0, local: prognosis.1)
-//     let sugg = try SessionCountEstimationObject(type: .suggestion, count: suggestion.0, local: suggestion.1)
-//     let estimation = SessionCountEstimation(prognosis: prog, suggestion: sugg)
-
-//     let quota = CustomQuota(
-//         base: 350,
-//         travelCost: travelCost,
-//         estimation: estimation
-//     )
-    
-//     return quota
-// }
-
 func render(quota: CustomQuota) throws {
     let tiers = quota.tiers()
 
