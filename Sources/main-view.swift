@@ -154,41 +154,13 @@ struct Responder: View {
     @State private var waMessageNotificationStyle: NotificationBannerType = .info
     @State private var waMessageNotificationContents: String = ""
 
-    @State private var base: String = "350"
-    @State private var kilometers: String = ""
-    @State private var prognosis: (String, String) = ("5", "4") // count -- local
-    @State private var suggestion: (String, String) = ("3", "2")
-    @State private var timeRate: String = "105"
-    @State private var travelRate: String = "0.25"
-    @State private var speed: String = "80"
-
-    // struct PreparedQuotaInputs {
-    //     let kilometers: Double
-    //     let prognosis: (Int, Int)
-    //     let suggestion: (Int, Int)
-    //     let base: Double
-    // }
-
-    // private var quotaInputs: PreparedQuotaInputs {
-    //     return PreparedQuotaInputs(
-    //         kilometers: Double(kilometerString) ?? 0.0,
-    //         prognosis: (Int(prognosis) ?? 0,Int(prognosisLocal) ?? 0),
-    //         suggestion: (Int(suggestion) ?? 0,Int(suggestionLocal) ?? 0),
-    //         base: Double(base) ?? 0.0
-    //     )
-    // }
-
-    // private func tryQuota() throws -> CustomQuota {
-    //     return try quota(
-    //         kilometers: quotaInputs.kilometers,
-    //         prognosis: quotaInputs.prognosis,
-    //         suggestion: quotaInputs.suggestion,
-    //         base: quotaInputs.base
-    //     )
-    // }
-
-    @State private var loadedQuota: CustomQuota? = nil
-    @State private var isLoadingQuota = false
+    // @State private var base: String = "350"
+    // @State private var kilometers: String = ""
+    // @State private var prognosis: (String, String) = ("5", "4") // count -- local
+    // @State private var suggestion: (String, String) = ("3", "2")
+    // @State private var timeRate: String = "105"
+    // @State private var travelRate: String = "0.25"
+    // @State private var speed: String = "80"
 
     var body: some View {
         HStack {
