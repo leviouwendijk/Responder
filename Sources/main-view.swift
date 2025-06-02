@@ -52,7 +52,14 @@ struct Responder: View {
         // let pattern = #"\{\{\s*(?!IMAGE_WIDTH\b)[^}]+\s*\}\}"#
         // return finalHtml.range(of: pattern, options: .regularExpression) != nil
         let ignorances = ["IMAGE_WIDTH"]
-        return finalHtml.containsRawTemplatePlaceholderSyntaxes(ignoring: ignorances)
+        let syntax = PlaceholderSyntax(prepending: "{", appending: "}", repeating: 2)
+        return finalHtml
+            .containsRawTemplatePlaceholderSyntaxes(
+                ignoring: ignorances,
+                placeholderSyntaxes: [syntax]
+            )
+
+            // .containsRawTemplatePlaceholderSyntaxes(ignoring: ignorances)
     }
 
     private var selectedWAMessageReplaced: String {
