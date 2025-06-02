@@ -1,13 +1,22 @@
 {
-  "originHash" : "c2981ed82c40e7637ae73b99f05422579972d060717a81a6cf6190a82c9d8508",
+  "originHash" : "fbdbd8c03008fa155494b2532691eef4bf67314cbcb5262cca823b0063f55def",
   "pins" : [
+    {
+      "identity" : "economics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Economics.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "a9c23b2a99b48b9ca939bbe1623ef557dd0248d4"
+      }
+    },
     {
       "identity" : "plate",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/leviouwendijk/plate.git",
       "state" : {
         "branch" : "master",
-        "revision" : "5704cb694d3912126a17c1c49d6ce47f9c5f21d5"
+        "revision" : "1f3d2c83d81c8633906c60edb32254f64715c9f7"
       }
     }
   ],

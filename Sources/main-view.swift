@@ -3,6 +3,7 @@ import SwiftUI
 import Contacts
 import EventKit
 import plate
+import Economics
 
 struct TemplateFetchResponse: Decodable {
     let success: Bool
@@ -10,12 +11,16 @@ struct TemplateFetchResponse: Decodable {
 }
 
 struct Responder: View {
+    // plate
     @EnvironmentObject var vm: MailerViewModel
     @EnvironmentObject var invoiceVm: MailerAPIInvoiceVariablesViewModel
 
     @StateObject private var weeklyScheduleVm = WeeklyScheduleViewModel()
     @StateObject private var contactsVm = ContactsListViewModel()
     @StateObject private var apiPathVm = MailerAPISelectionViewModel()
+
+    // Economics
+    @StateObject private var quotaVm = QuotaViewModel()
 
     @State private var client = ""
     @State private var email = ""
@@ -148,6 +153,42 @@ struct Responder: View {
     @State private var showWAMessageNotification: Bool = false
     @State private var waMessageNotificationStyle: NotificationBannerType = .info
     @State private var waMessageNotificationContents: String = ""
+
+    @State private var base: String = "350"
+    @State private var kilometers: String = ""
+    @State private var prognosis: (String, String) = ("5", "4") // count -- local
+    @State private var suggestion: (String, String) = ("3", "2")
+    @State private var timeRate: String = "105"
+    @State private var travelRate: String = "0.25"
+    @State private var speed: String = "80"
+
+    // struct PreparedQuotaInputs {
+    //     let kilometers: Double
+    //     let prognosis: (Int, Int)
+    //     let suggestion: (Int, Int)
+    //     let base: Double
+    // }
+
+    // private var quotaInputs: PreparedQuotaInputs {
+    //     return PreparedQuotaInputs(
+    //         kilometers: Double(kilometerString) ?? 0.0,
+    //         prognosis: (Int(prognosis) ?? 0,Int(prognosisLocal) ?? 0),
+    //         suggestion: (Int(suggestion) ?? 0,Int(suggestionLocal) ?? 0),
+    //         base: Double(base) ?? 0.0
+    //     )
+    // }
+
+    // private func tryQuota() throws -> CustomQuota {
+    //     return try quota(
+    //         kilometers: quotaInputs.kilometers,
+    //         prognosis: quotaInputs.prognosis,
+    //         suggestion: quotaInputs.suggestion,
+    //         base: quotaInputs.base
+    //     )
+    // }
+
+    @State private var loadedQuota: CustomQuota? = nil
+    @State private var isLoadingQuota = false
 
     var body: some View {
         HStack {
@@ -413,6 +454,160 @@ struct Responder: View {
                         .padding()
                     }
                     .padding()
+                } else if apiPathVm.selectedRoute == .quote {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // 1) “Kilometers” field
+                        StandardTextField(
+                            "kilometers",
+                            text: $kilometers,
+                            placeholder: "45"
+                        )
+                        .onSubmit {
+                            convertQuotaInputs()
+                        }
+
+                        // 2) Prognosis / Local
+                        HStack {
+                            StandardTextField(
+                                "prognosis",
+                                text: Binding<String>(
+                                    get:  { prognosis.0 },
+                                    set:  { prognosis.0 = $0 }
+                                ),
+                                placeholder: "5"
+                            )
+                            .onSubmit {
+                                convertQuotaInputs()
+                            }
+
+                            StandardTextField(
+                                "local",
+                                text: Binding<String>(
+                                    get:  { prognosis.1 },
+                                    set:  { prognosis.1 = $0 }
+                                ),
+                                placeholder: "4"
+                            )
+                            .onSubmit {
+                                convertQuotaInputs()
+                            }
+                        }
+
+                        // 3) Suggestion / Local
+                        HStack {
+                            StandardTextField(
+                                "suggestion",
+                                text: Binding<String>(
+                                    get:  { suggestion.0 },
+                                    set:  { suggestion.0 = $0 }
+                                ),
+                                placeholder: "3"
+                            )
+                            .onSubmit {
+                                convertQuotaInputs()
+                            }
+
+                            StandardTextField(
+                                "local",
+                                text: Binding<String>(
+                                    get:  { suggestion.1 },
+                                    set:  { suggestion.1 = $0 }
+                                ),
+                                placeholder: "2"
+                            )
+                            .onSubmit {
+                                convertQuotaInputs()
+                            }
+                        }
+
+                        // 4) Base
+                        StandardTextField(
+                            "base",
+                            text: $base,
+                            placeholder: "350"
+                        )
+                        .onSubmit {
+                            convertQuotaInputs()
+                        }
+
+                        // 5) Travel‐cost fields
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Travel Cost Inputs").bold()
+
+                            HStack {
+                                // (b) Speed
+                                StandardTextField(
+                                    "speed",
+                                    text: $speed,
+                                    placeholder: "80"
+                                )
+                                .onSubmit {
+                                    convertQuotaInputs()
+                                }
+
+                                // (c) Rate/travel
+                                StandardTextField(
+                                    "rate/travel",
+                                    text: $travelRate,
+                                    placeholder: "0.25"
+                                )
+                                .onSubmit {
+                                    convertQuotaInputs()
+                                }
+
+                                // (d) Rate/time
+                                StandardTextField(
+                                    "rate/time",
+                                    text: $timeRate,
+                                    placeholder: "105"
+                                )
+                                .onSubmit {
+                                    convertQuotaInputs()
+                                }
+                            }
+                        }
+                        .padding(.top, 8)
+
+                        StandardButton(
+                            type: .execute,
+                            title: "Compute quota",
+                            subtitle: ""
+                        ) {
+                            convertQuotaInputs()
+                        }
+                        .padding(.top, 8)
+
+                        // 7) Show spinner / table / “enter values”
+                        if quotaVm.isLoading {
+                            ProgressView("Computing quota…")
+                                .padding(.top, 16)
+                        }
+                        else if let quota = quotaVm.loadedQuota {
+                            QuotaTierListView(quota: quota)
+                                .padding(.top, 16)
+
+                            StandardButton(
+                                type: .execute,
+                                title: "Render PDF",
+                                action: {
+                                    do {
+                                        try render(quota: quota)
+                                    } catch {
+                                        print(error)
+                                    }
+                                }
+                            )
+                            .padding(.top, 8)
+                        }
+                        else {
+                            NotificationBanner(
+                                type: .info,
+                                message: "Hit Return or tap Recompute above"
+                            )
+                            .padding(.top, 16)
+                        }
+                    }
+                    .padding()
                 } else {
 
                     if apiPathVm.endpointNeedsAvailabilityVariable {
@@ -626,6 +821,33 @@ struct Responder: View {
         selectedContact = nil
     }
 
+    private func convertQuotaInputs() {
+        let inputs = CustomQuotaInputs(
+            base: base,
+            prognosis: SessionCountEstimationInputs(
+                type: .prognosis,
+                count: prognosis.0,
+                local: prognosis.1
+            ),
+            suggestion: SessionCountEstimationInputs(
+                type: .suggestion,
+                count: suggestion.0,
+                local: suggestion.1
+            ),
+            travelCost: TravelCostInputs(
+                kilometers: kilometers,
+                speed: speed,
+                rates: TravelCostRatesInputs(
+                    travel: travelRate,
+                    time: timeRate
+                ),
+                roundTrip: true
+            )
+        )
+
+        quotaVm.customQuotaInputs = inputs
+        // quotaVm.compute()
+    }
 }
 
 struct StateVariables {
