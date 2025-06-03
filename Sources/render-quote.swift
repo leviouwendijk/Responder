@@ -8,19 +8,45 @@ func prepareEnvironment() throws {
     ApplicationEnvironmentLoader.set(to: vars)
 }
 
-func render(quota: CustomQuota) throws {
+// good generic render implementation, but unused for particular tier selection export
+// func render(quota: CustomQuota) throws {
+//     try prepareEnvironment()
+
+//     let tiers = quota.tiers()
+
+//     var repls: [StringTemplateReplacement] = []
+
+//     for t in tiers {
+//         let r = t.replacements(roundTo: 10)
+//         repls.append(contentsOf: r)
+//     }
+    
+//     let estPlaceholders = quota.replacements()
+//     repls.append(contentsOf: estPlaceholders)
+
+//     // let logoPath = try LoadableResource(name: "logo", fileExtension: "png").path()
+//     let logoPath = try ResourcesEnvironment.require(.h_logo)
+//     let logoRepl = StringTemplateReplacement(placeholders: ["logo_path"], replacement: logoPath, initializer: .auto)
+//     repls.append(logoRepl)
+
+//     let templatePath = try ResourcesEnvironment.require(.quote_template)
+//     let outputPath = "\(Home.string())/myworkdir/pdf_output/travel/offerte.pdf"
+//     print("out:", outputPath)
+
+//     try pdf(template: templatePath, destination: outputPath, replacements: repls)
+// }
+
+func renderTier(quota: CustomQuota, for tier: QuotaTierType) throws {
     try prepareEnvironment()
 
-    let tiers = quota.tiers()
+    let t = quota.tier(for: tier)
 
     var repls: [StringTemplateReplacement] = []
 
-    for t in tiers {
-        let r = t.replacements(roundTo: 10)
-        repls.append(contentsOf: r)
-    }
+    let r = t.universalReplacements(roundTo: 10)
+    repls.append(contentsOf: r)
     
-    let estPlaceholders = quota.replacements()
+    let estPlaceholders = quota.replacements(for: tier)
     repls.append(contentsOf: estPlaceholders)
 
     // let logoPath = try LoadableResource(name: "logo", fileExtension: "png").path()

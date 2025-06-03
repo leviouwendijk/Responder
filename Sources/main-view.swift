@@ -157,21 +157,18 @@ struct Responder: View {
 
     @State private var selectedWAMessage: WAMessageTemplate = .called
 
-    @State private var showWAMessageNotification: Bool = false
-    @State private var waMessageNotificationStyle: NotificationBannerType = .info
-    @State private var waMessageNotificationContents: String = ""
+    // @State private var showWAMessageNotification: Bool = false
+    // @State private var waMessageNotificationStyle: NotificationBannerType = .info
+    // @State private var waMessageNotificationContents: String = ""
+    @State private var waMessageNotifier: NotificationBannerController = NotificationBannerController()
     
-    @State private var showRenderPdfNotification: Bool = false
-    @State private var renderPdfNotificationStyle: NotificationBannerType = .info
-    @State private var renderPdfNotificationContents: String = ""
+    // @State private var showRenderPdfNotification: Bool = false
+    // @State private var renderPdfNotificationStyle: NotificationBannerType = .info
+    // @State private var renderPdfNotificationContents: String = ""
 
-    // @State private var base: String = "350"
-    // @State private var kilometers: String = ""
-    // @State private var prognosis: (String, String) = ("5", "4") // count -- local
-    // @State private var suggestion: (String, String) = ("3", "2")
-    // @State private var timeRate: String = "105"
-    // @State private var travelRate: String = "0.25"
-    // @State private var speed: String = "80"
+    @StateObject private var localPdfNotifier: NotificationBannerController = NotificationBannerController()
+    @StateObject private var combinedPdfNotifier: NotificationBannerController = NotificationBannerController()
+    @StateObject private var remotePdfNotifier: NotificationBannerController = NotificationBannerController()
 
     var body: some View {
         HStack {
@@ -218,7 +215,8 @@ struct Responder: View {
 
                                 // extra clearance logic, wa related:
                                 if !selectedWAMessageReplaced.containsRawTemplatePlaceholderSyntaxes() {
-                                    showWAMessageNotification = false
+                                    // showWAMessageNotification = false
+                                    waMessageNotifier.show = false
                                 }
 
                             },
@@ -338,28 +336,33 @@ struct Responder: View {
                                     ) {
                                         if !waMessageContainsRawPlaceholders {
                                             withAnimation {
-                                                showWAMessageNotification = false
+                                                // showWAMessageNotification = false
+                                                waMessageNotifier.show = false
                                             }
 
                                             selectedWAMessageReplaced
                                                 .clipboard()
 
-                                            waMessageNotificationContents = "WA message copied"
-                                            waMessageNotificationStyle = .success
+                                            // waMessageNotificationContents = "WA message copied"
+                                            // waMessageNotificationStyle = .success
+                                            waMessageNotifier.message = "WA message copied"
+                                            waMessageNotifier.style = .success
                                             withAnimation {
-                                                showWAMessageNotification = true
+                                                waMessageNotifier.show = true
                                             }
 
                                             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                                                 withAnimation { 
-                                                    showWAMessageNotification = false 
+                                                    waMessageNotifier.show = false
                                                 }
                                             }
                                         } else {
-                                            waMessageNotificationStyle = .error
-                                            waMessageNotificationContents = "WA message contains raw placeholders"
+                                            // waMessageNotificationStyle = .error
+                                            // waMessageNotificationContents = "WA message contains raw placeholders"
+                                            waMessageNotifier.style = .error
+                                            waMessageNotifier.message = "WA message contains raw placeholders"
                                             withAnimation {
-                                                showWAMessageNotification = true
+                                                waMessageNotifier.show = true
                                             }
                                         }
                                     }
@@ -369,14 +372,12 @@ struct Responder: View {
                                 }
                                 .frame(maxWidth: 350)
 
-                                // if showWAMessageNotification {
-                                    NotificationBanner(
-                                        type: waMessageNotificationStyle,
-                                        message: waMessageNotificationContents
-                                    )
-                                    .zIndex(2)
-                                    .hide(when: !showWAMessageNotification)
-                                // }
+                                NotificationBanner(
+                                    type: waMessageNotifier.style,
+                                    message: waMessageNotifier.message
+                                )
+                                .zIndex(2)
+                                .hide(when: waMessageNotifier.hide)
                             }
                         }
                     }
@@ -564,56 +565,165 @@ struct Responder: View {
                             QuotaTierListView(quota: quota)
                                 .padding(.top, 16)
 
-                            HStack {
-                                StandardButton(
-                                    type: .execute,
-                                    title: "Render PDF",
-                                    action: {
-                                        do {
-                                            withAnimation {
-                                                showRenderPdfNotification = false
-                                            }
+                            HStack(spacing: 45) {
+                                Spacer()
 
-                                            try render(quota: quota)
-
-                                            renderPdfNotificationContents = "quota pdf rendered"
-                                            renderPdfNotificationStyle = .success
-                                            withAnimation {
-                                                showRenderPdfNotification = true
-                                            }
-
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                                                withAnimation { 
-                                                    showRenderPdfNotification = false 
+                                VStack {
+                                    StandardButton(
+                                        type: .execute,
+                                        title: "Render Local",
+                                        action: {
+                                            do {
+                                                withAnimation {
+                                                    localPdfNotifier.show = false
                                                 }
-                                            }
-                                        } catch {
-                                            withAnimation {
-                                                showRenderPdfNotification = false
-                                            }
 
-                                            renderPdfNotificationContents = "render failed: \(error)"
-                                            renderPdfNotificationStyle = .error
-                                            withAnimation {
-                                                showRenderPdfNotification = true
-                                            }
+                                                try renderTier(quota: quota, for: .local)
 
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                                                withAnimation { 
-                                                    showRenderPdfNotification = false 
+                                                localPdfNotifier.message = "quota pdf rendered"
+                                                localPdfNotifier.style = .success
+                                                withAnimation {
+                                                    localPdfNotifier.show = true
+                                                }
+
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                                    withAnimation { 
+                                                        localPdfNotifier.show = false
+                                                    }
+                                                }
+                                            } catch {
+                                                withAnimation {
+                                                    localPdfNotifier.show = false
+                                                }
+
+                                                localPdfNotifier.message = "render failed: \(error)"
+                                                localPdfNotifier.style = .error
+                                                withAnimation {
+                                                    localPdfNotifier.show = true
+                                                }
+
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                                    withAnimation { 
+                                                        localPdfNotifier.show = false 
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
-                                )
-                                .disabled((quotaVm.loadedQuota == nil))
-                                .padding(.top, 8)
+                                    )
+                                    .disabled((quotaVm.loadedQuota == nil))
+                                    .padding(.top, 8)
 
-                                NotificationBanner(
-                                    type: renderPdfNotificationStyle,
-                                    message: renderPdfNotificationContents
-                                )
-                                .hide(when: !showRenderPdfNotification)
+                                    NotificationBanner(
+                                        type: localPdfNotifier.style,
+                                        message: localPdfNotifier.message
+                                    )
+                                    .hide(when: localPdfNotifier.hide)
+                                }
+
+                                VStack {
+                                    StandardButton(
+                                        type: .execute,
+                                        title: "Render Combined",
+                                        action: {
+                                            do {
+                                                withAnimation {
+                                                    combinedPdfNotifier.show = false
+                                                }
+
+                                                try renderTier(quota: quota, for: .combined)
+
+                                                combinedPdfNotifier.message = "quota pdf rendered"
+                                                combinedPdfNotifier.style = .success
+                                                withAnimation {
+                                                    combinedPdfNotifier.show = true
+                                                }
+
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                                    withAnimation { 
+                                                        combinedPdfNotifier.show = false
+                                                    }
+                                                }
+                                            } catch {
+                                                withAnimation {
+                                                    combinedPdfNotifier.show = false
+                                                }
+
+                                                combinedPdfNotifier.message = "render failed: \(error)"
+                                                combinedPdfNotifier.style = .error
+                                                withAnimation {
+                                                    combinedPdfNotifier.show = true
+                                                }
+
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                                    withAnimation { 
+                                                        combinedPdfNotifier.show = false 
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    )
+                                    .disabled((quotaVm.loadedQuota == nil))
+                                    .padding(.top, 8)
+
+                                    NotificationBanner(
+                                        type: combinedPdfNotifier.style,
+                                        message: combinedPdfNotifier.message
+                                    )
+                                    .hide(when: combinedPdfNotifier.hide)
+                                }
+
+                                VStack {
+                                    StandardButton(
+                                        type: .execute,
+                                        title: "Render Remote",
+                                        action: {
+                                            do {
+                                                withAnimation {
+                                                    remotePdfNotifier.show = false
+                                                }
+
+                                                try renderTier(quota: quota, for: .remote)
+
+                                                remotePdfNotifier.message = "quota pdf rendered"
+                                                remotePdfNotifier.style = .success
+                                                withAnimation {
+                                                    remotePdfNotifier.show = true
+                                                }
+
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                                    withAnimation { 
+                                                        remotePdfNotifier.show = false
+                                                    }
+                                                }
+                                            } catch {
+                                                withAnimation {
+                                                    remotePdfNotifier.show = false
+                                                }
+
+                                                remotePdfNotifier.message = "render failed: \(error)"
+                                                remotePdfNotifier.style = .error
+                                                withAnimation {
+                                                    remotePdfNotifier.show = true
+                                                }
+
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                                    withAnimation { 
+                                                        remotePdfNotifier.show = false 
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    )
+                                    .disabled((quotaVm.loadedQuota == nil))
+                                    .padding(.top, 8)
+
+                                    NotificationBanner(
+                                        type: remotePdfNotifier.style,
+                                        message: remotePdfNotifier.message
+                                    )
+                                    .hide(when: remotePdfNotifier.hide)
+                                }
+                                .padding(.trailing, 40)
                             }
                         }
                         else {
