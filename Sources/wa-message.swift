@@ -122,7 +122,9 @@ struct WAMessageDropdown: View {
 
 enum WAMessageTemplate: String, Hashable, CaseIterable {
     case called
-    case calledVariation
+    case calledVariationI
+    case calledVariationII
+    case losing
     case repeatedCalls
     case follow
 
@@ -131,8 +133,14 @@ enum WAMessageTemplate: String, Hashable, CaseIterable {
             case .called:
                 return "Called"
 
-            case .calledVariation:
-                return "Called -- Variation"
+            case .calledVariationI:
+                return "Called -- Variation I"
+
+            case .calledVariationII:
+                return "Called -- Variation II"
+
+            case .losing:
+                return "Losing"
 
             case .repeatedCalls:
                 return "Repeated Calls"
@@ -145,10 +153,10 @@ enum WAMessageTemplate: String, Hashable, CaseIterable {
 
     var subtitle: String {
         switch self {
-            case .called:
+            case .called, .calledVariationI, .calledVariationII:
                 return "Call attempt, \"do you need us?\"--check, prompt to call us"
 
-            case .calledVariation:
+            case .losing:
                 return "Call attempt, \"do you need us?\"--check"
 
             case .repeatedCalls:
@@ -174,7 +182,35 @@ enum WAMessageTemplate: String, Hashable, CaseIterable {
             —Casper | Hondenmeesters
             """
 
-        case .calledVariation:
+        case .calledVariationI:
+            return """
+            Hey {client},
+
+            Ik heb je gebeld, maar kon je niet bereiken. 
+
+            Graag spreek ik je over {dog}. Bel mij even terug wanneer het jou uitkomt.
+
+            Je kan me bereiken op dit nummer (+316 23 62 13 90).
+
+            —Casper | Hondenmeesters
+            """
+
+        case .calledVariationII:
+            return """
+            Hey {client},
+
+            Ik heb je gebeld, maar kon je niet bereiken. 
+
+            Graag spreek ik je nog even over {dog}.
+
+            Je kan me terugbellen op dit nummer (+316 23 62 13 90).
+
+            —Casper | Hondenmeesters
+
+            """
+
+
+        case .losing:
             return """
             Hey {client},
 
