@@ -6,18 +6,8 @@ struct ResponderApp: App {
     @StateObject private var mailerViewModel = MailerViewModel()
     @StateObject private var invoiceVm = MailerAPIInvoiceVariablesViewModel()
 
-    // let buildSpecification: BuildSpecification
-
-    // let buildSpecification = BuildSpecification(
-    //   version: BuildVersion(major: 2, minor: 4, patch: 1),
-    //   name: "Responder",
-    //   author: "Levi Ouwendijk",
-    //   description: ""
-    // )
-
     init() {
         NSWindow.allowsAutomaticWindowTabbing = false
-
     }
 
     @State private var selectedTab: Int = 0
@@ -34,13 +24,6 @@ struct ResponderApp: App {
                       }
                       .tag(0)
 
-                    // MessageMakerView()
-                    //   .environmentObject(mailerViewModel)
-                    //   .tabItem {
-                    //     Label("WA", systemImage: "message.fill")
-                    //   }
-                    //   .tag(1)
-
                     MailerStandardOutput()
                       .environmentObject(mailerViewModel)
                       .tabItem {
@@ -49,15 +32,7 @@ struct ResponderApp: App {
                       .tag(1)
                 }
 
-                // BuildInformation(
-                //     specification: buildSpecification,
-                //     alignment: .center,
-                //     display: [.version, .versionPrefix],
-                //     prefixStyle: .long
-                // )
-
                 BuildInformationSwitch(
-                    // specification: buildSpecification,
                     alignment: .center,
                     display: [
                         [.version],

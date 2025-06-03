@@ -157,18 +157,20 @@ struct Responder: View {
 
     @State private var selectedWAMessage: WAMessageTemplate = .called
 
-    // @State private var showWAMessageNotification: Bool = false
-    // @State private var waMessageNotificationStyle: NotificationBannerType = .info
-    // @State private var waMessageNotificationContents: String = ""
-    @State private var waMessageNotifier: NotificationBannerController = NotificationBannerController()
-    
-    // @State private var showRenderPdfNotification: Bool = false
-    // @State private var renderPdfNotificationStyle: NotificationBannerType = .info
-    // @State private var renderPdfNotificationContents: String = ""
+    @StateObject private var waMessageNotifier: NotificationBannerController = NotificationBannerController()
 
     @StateObject private var localPdfNotifier: NotificationBannerController = NotificationBannerController()
     @StateObject private var combinedPdfNotifier: NotificationBannerController = NotificationBannerController()
     @StateObject private var remotePdfNotifier: NotificationBannerController = NotificationBannerController()
+
+    @StateObject private var copyQuotaNotifier: NotificationBannerController = NotificationBannerController(
+        contents: [NotificationBannerControllerContents(title: "copied", style: .success, message: "output copied")],
+        addingDefaultContents: true
+    )
+
+    private var clientIdentifier: String {
+        return "\(client) | \(dog) (\(email))"
+    }
 
     var body: some View {
         HStack {
@@ -336,15 +338,12 @@ struct Responder: View {
                                     ) {
                                         if !waMessageContainsRawPlaceholders {
                                             withAnimation {
-                                                // showWAMessageNotification = false
                                                 waMessageNotifier.show = false
                                             }
 
                                             selectedWAMessageReplaced
                                                 .clipboard()
 
-                                            // waMessageNotificationContents = "WA message copied"
-                                            // waMessageNotificationStyle = .success
                                             waMessageNotifier.message = "WA message copied"
                                             waMessageNotifier.style = .success
                                             withAnimation {
@@ -357,8 +356,6 @@ struct Responder: View {
                                                 }
                                             }
                                         } else {
-                                            // waMessageNotificationStyle = .error
-                                            // waMessageNotificationContents = "WA message contains raw placeholders"
                                             waMessageNotifier.style = .error
                                             waMessageNotifier.message = "WA message contains raw placeholders"
                                             withAnimation {
@@ -512,7 +509,7 @@ struct Responder: View {
                             placeholder: "350"
                         )
 
-                        // 5) Travel‐cost fields (if you want them visible here)
+                        // 5) Travel‐cost fields
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Travel Cost Inputs").bold()
                             HStack {
@@ -567,6 +564,21 @@ struct Responder: View {
 
                             HStack(spacing: 45) {
                                 Spacer()
+
+                                StandardNotifyingButton(
+                                    type: .copy,
+                                    title: "settings",
+                                    action: {
+                                        if let table = quotaVm.loadedQuota?.quotaSummary(clientIdentifier: clientIdentifier) {
+                                            copyToClipboard(table)
+                                            copyQuotaNotifier.setAndNotify(to: "copied")
+                                        } else {
+                                            copyQuotaNotifier.setAndNotify(to: "error")
+                                        }
+                                    },
+                                    notifier: copyQuotaNotifier,
+                                    notifierPosition: .under
+                                )
 
                                 VStack {
                                     StandardButton(

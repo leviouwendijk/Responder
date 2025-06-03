@@ -7,7 +7,7 @@
       "location" : "https://github.com/leviouwendijk/Economics.git",
       "state" : {
         "branch" : "master",
-        "revision" : "53f8d2969f5f216e29dd51cced8f799ddf22100b"
+        "revision" : "8b2ef61bc1d0250bff01c5a85efa11ed6c8a4e0c"
       }
     },
     {
@@ -16,7 +16,7 @@
       "location" : "https://github.com/leviouwendijk/plate.git",
       "state" : {
         "branch" : "master",
-        "revision" : "0281253323a0d3b0fb30426c7632d51613e9ce1b"
+        "revision" : "c6e818b2a540bad3d55e658b3e037747490e7336"
       }
     }
   ],
