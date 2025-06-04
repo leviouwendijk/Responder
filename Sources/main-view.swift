@@ -169,7 +169,7 @@ struct Responder: View {
     )
 
     private var clientIdentifier: String {
-        return "\(client) | \(dog) (\(email))"
+        return "\(client.isEmpty ? "{client}" : client) | \(dog.isEmpty ? "{dog}": dog) (\(email.isEmpty ? "{email}" : email))"
     }
 
     var body: some View {
@@ -562,8 +562,8 @@ struct Responder: View {
                             QuotaTierListView(quota: quota)
                                 .padding(.top, 16)
 
-                            HStack(spacing: 45) {
-                                Spacer()
+                            HStack(alignment: .center, spacing: 45) {
+                                // Spacer()
 
                                 StandardNotifyingButton(
                                     type: .copy,
@@ -737,6 +737,7 @@ struct Responder: View {
                                 }
                                 .padding(.trailing, 40)
                             }
+                            .frame(maxWidth: .infinity, alignment: .center)
                         }
                         else {
                             NotificationBanner(
