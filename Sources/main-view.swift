@@ -509,6 +509,31 @@ struct Responder: View {
                             )
                         }
 
+                        // Singular / Local
+                        HStack {
+                            StandardTextField(
+                                "singular",
+                                text: Binding<String>(
+                                    get:  { quotaVm.customQuotaInputs.singular.count },
+                                    set:  { newValue in
+                                        quotaVm.customQuotaInputs.singular.count = newValue
+                                    }
+                                ),
+                                placeholder: "1"
+                            )
+                            StandardTextField(
+                                "local",
+                                text: Binding<String>(
+                                    get:  { quotaVm.customQuotaInputs.singular.local },
+                                    set:  { newValue in
+                                        quotaVm.customQuotaInputs.singular.local = newValue
+                                    }
+                                ),
+                                placeholder: "0"
+                            )
+                        }
+
+
                         // 4) Base
                         StandardTextField(
                             "base",
