@@ -1,6 +1,7 @@
 import Foundation
 import plate
 import Economics
+import Interfaces
 
 func prepareEnvironment() throws {
     let env = DefaultEnvironmentVariables.string()
@@ -39,15 +40,18 @@ func prepareEnvironment() throws {
 func renderTier(quota: CustomQuota, for tier: QuotaTierType) throws {
     try prepareEnvironment()
 
-    let t = quota.tier(for: tier)
+    let t = try quota.tier(being: tier)
 
     var repls: [StringTemplateReplacement] = []
 
-    let r = t.universalReplacements(roundTo: 10)
-    repls.append(contentsOf: r)
+    let p = t.standardPriceStringReplacements(roundTo: 10)
+    repls.append(contentsOf: p)
+
+    let l = t.locationStringReplacements()
+    repls.append(contentsOf: l)
     
-    let estPlaceholders = quota.replacements(for: tier)
-    repls.append(contentsOf: estPlaceholders)
+    let kmCode = quota.kilometerCodeReplacement(for: tier)
+    repls.append(contentsOf: kmCode)
 
     // let logoPath = try LoadableResource(name: "logo", fileExtension: "png").path()
     let logoPath = try ResourcesEnvironment.require(.h_logo)

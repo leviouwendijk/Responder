@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import plate
+import ViewComponents
 
 struct MailerStandardOutput: View {
     @EnvironmentObject var vm: MailerViewModel

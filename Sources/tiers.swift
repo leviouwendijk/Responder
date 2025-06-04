@@ -1,12 +1,41 @@
 import SwiftUI
 import plate
 import Economics
+import ViewComponents
 
 struct QuotaTierListView: View {
     let quota: CustomQuota
+    private var tiers: [QuotaTierContent]? = nil
 
-    private var tiers: [QuotaTierContent] {
-        quota.tiers()
+    init(
+        quota: CustomQuota
+    ) {
+        self.quota = quota
+        self.tiers = try? quota.tiers()
+    }
+
+    var body: some View {
+        Group {
+            if let t = tiers {
+                QuotaTierListSubView(tiers: t)
+                    .padding(.top, 16)
+            } else {
+                NotificationBanner(
+                    type: .info,
+                    message: "Could not initialize QuotaTierListSubView with current inputs"
+                )
+            }
+        }
+    }
+}
+
+struct QuotaTierListSubView: View {
+    let tiers: [QuotaTierContent]
+
+    init(
+        tiers: [QuotaTierContent]
+    ) {
+        self.tiers = tiers
     }
 
     var body: some View {
@@ -43,11 +72,7 @@ struct QuotaTierListView: View {
                         rowLabelWidth: 80,
                         tiers: tiers,
                         valuesFor: { content in
-                            [
-                                ("prognosis", content.price.prognosis),
-                                ("suggestion", content.price.suggestion),
-                                ("base", content.price.base)
-                            ]
+                            content.levels.viewableTuples(of: .price)
                         },
                         textColor: .primary
                     )
@@ -70,11 +95,7 @@ struct QuotaTierListView: View {
                         rowLabelWidth: 80,
                         tiers: tiers,
                         valuesFor: { content in
-                            [
-                                ("prognosis", content.cost.prognosis),
-                                ("suggestion", content.cost.suggestion),
-                                ("base", content.cost.base)
-                            ]
+                            content.levels.viewableTuples(of: .cost)
                         },
                         textColor: .secondary
                     )
@@ -97,11 +118,7 @@ struct QuotaTierListView: View {
                         rowLabelWidth: 80,
                         tiers: tiers,
                         valuesFor: { content in
-                            [
-                                ("prognosis", content.base.prognosis),
-                                ("suggestion", content.base.suggestion),
-                                ("base", content.base.base)
-                            ]
+                            content.levels.viewableTuples(of: .base)
                         },
                         textColor: .secondary
                     )

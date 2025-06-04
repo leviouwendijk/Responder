@@ -1,5 +1,8 @@
 import SwiftUI
 import plate
+import Interfaces
+import ViewComponents
+import Compositions
 
 @main
 struct ResponderApp: App {

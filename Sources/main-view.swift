@@ -4,6 +4,9 @@ import Contacts
 import EventKit
 import plate
 import Economics
+import Compositions
+import ViewComponents
+import Interfaces
 
 struct TemplateFetchResponse: Decodable {
     let success: Bool
@@ -169,7 +172,16 @@ struct Responder: View {
     )
 
     private var clientIdentifier: String {
-        return "\(client.isEmpty ? "{client}" : client) | \(dog.isEmpty ? "{dog}": dog) (\(email.isEmpty ? "{email}" : email))"
+        let c = client.isEmpty ? "{client}" : client
+        let d = dog.isEmpty ? "{dog}": dog
+        let e = email.isEmpty ? "{email}" : email
+
+        let allEmpty = (client.isEmpty && dog.isEmpty && email.isEmpty)
+
+        let sequence = "\(c) | \(d) (\(e))"
+        let fallback = "no contact specified"
+
+        return allEmpty ? fallback : sequence
     }
 
     var body: some View {
@@ -569,7 +581,7 @@ struct Responder: View {
                                     type: .copy,
                                     title: "settings",
                                     action: {
-                                        if let table = quotaVm.loadedQuota?.quotaSummary(clientIdentifier: clientIdentifier) {
+                                        if let table = try? quotaVm.loadedQuota?.quotaSummary(clientIdentifier: clientIdentifier) {
                                             copyToClipboard(table)
                                             copyQuotaNotifier.setAndNotify(to: "copied")
                                         } else {
