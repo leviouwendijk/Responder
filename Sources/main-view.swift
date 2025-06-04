@@ -579,7 +579,7 @@ struct Responder: View {
 
                                 StandardNotifyingButton(
                                     type: .copy,
-                                    title: "settings",
+                                    title: "set",
                                     action: {
                                         if let table = try? quotaVm.loadedQuota?.quotaSummary(clientIdentifier: clientIdentifier) {
                                             copyToClipboard(table)
