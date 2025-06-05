@@ -7,7 +7,7 @@ import Compositions
 import Contacts
 import Economics
 
-struct ValuesPaneView: View {
+struct ValuesPaneView: View, @preconcurrency Equatable {
     // observables (passed)
     @ObservedObject var apiPathVm: MailerAPISelectionViewModel
     @ObservedObject var weeklyScheduleVm: WeeklyScheduleViewModel
@@ -35,6 +35,20 @@ struct ValuesPaneView: View {
     let clientIdentifier: String
 
     let sendMailerEmail: () throws -> Void
+
+    static func == (lhs: ValuesPaneView, rhs: ValuesPaneView) -> Bool {
+        return lhs.subject                     == rhs.subject &&
+               lhs.fetchedHtml                 == rhs.fetchedHtml &&
+               lhs.includeQuoteInCustomMessage == rhs.includeQuoteInCustomMessage &&
+               lhs.showSuccessBanner           == rhs.showSuccessBanner &&
+               lhs.successBannerMessage        == rhs.successBannerMessage &&
+               lhs.bannerColor                 == rhs.bannerColor &&
+               lhs.isSendingEmail              == rhs.isSendingEmail &&
+               lhs.anyInvalidConditionsCheck   == rhs.anyInvalidConditionsCheck &&
+               lhs.emptySubjectWarning         == rhs.emptySubjectWarning &&
+               lhs.finalHtmlContainsRawVariables == rhs.finalHtmlContainsRawVariables &&
+               lhs.clientIdentifier            == rhs.clientIdentifier
+    }
 
     var body: some View {
         VStack {

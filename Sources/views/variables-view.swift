@@ -6,7 +6,7 @@ import ViewComponents
 import Compositions
 import Contacts
 
-struct VariablesView: View {
+struct VariablesView: View, @preconcurrency Equatable {
     @ObservedObject var contactsVm: ContactsListViewModel
     @ObservedObject var apiPathVm: MailerAPISelectionViewModel
     @ObservedObject var invoiceVm: MailerAPIInvoiceVariablesViewModel
@@ -41,6 +41,30 @@ struct VariablesView: View {
 
     let sendMailerEmail: () throws -> Void
     let clearContact: () -> Void
+
+    static func == (lhs: VariablesView, rhs: VariablesView) -> Bool {
+        return lhs.local                                       == rhs.local &&
+               lhs.selectedContact == rhs.selectedContact       &&
+               lhs.client                                      == rhs.client &&
+               lhs.dog                                         == rhs.dog &&
+               lhs.email                                       == rhs.email &&
+               lhs.location                                    == rhs.location &&
+               lhs.areaCode                                    == rhs.areaCode &&
+               lhs.street                                      == rhs.street &&
+               lhs.number                                      == rhs.number &&
+               lhs.localLocation                               == rhs.localLocation &&
+               lhs.fetchableCategory                           == rhs.fetchableCategory &&
+               lhs.fetchableFile                               == rhs.fetchableFile &&
+               lhs.subject                                     == rhs.subject &&
+               lhs.fetchedHtml                                 == rhs.fetchedHtml &&
+               lhs.selectedWAMessage                           == rhs.selectedWAMessage &&
+               lhs.anyInvalidConditionsCheck                   == rhs.anyInvalidConditionsCheck &&
+               lhs.emptyEmailWarning                           == rhs.emptyEmailWarning &&
+               lhs.emptySubjectWarning                         == rhs.emptySubjectWarning &&
+               lhs.finalHtmlContainsRawVariables               == rhs.finalHtmlContainsRawVariables &&
+               lhs.selectedWAMessageReplaced                   == rhs.selectedWAMessageReplaced &&
+               lhs.waMessageContainsRawPlaceholders            == rhs.waMessageContainsRawPlaceholders
+    }
 
     var body: some View {
         VStack {

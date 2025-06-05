@@ -16,8 +16,8 @@ struct QuotaTierListView: View {
                     .padding(.top, 16)
             } else {
                 VStack {
-                    NotificationBanner(type: .info,
-                            message: "Loading tiers…")
+                    // NotificationBanner(type: .info,
+                    //         message: "Loading tiers…")
                     NotificationBanner(type: .warning,
                             message: message)
                 }
