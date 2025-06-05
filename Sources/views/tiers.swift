@@ -5,19 +5,9 @@ import ViewComponents
 
 struct QuotaTierListView: View {
     let quota: CustomQuota
-    private var tiers: [QuotaTierContent]? = nil
-    private var message: String = ""
 
-    init(
-        quota: CustomQuota
-    ) {
-        self.quota = quota
-        do {
-            self.tiers = try quota.tiers()
-        } catch {
-            self.message = error.localizedDescription
-        }
-    }
+    @State private var tiers: [QuotaTierContent]? = nil
+    @State private var message: String = ""
 
     var body: some View {
         Group {
@@ -26,15 +16,17 @@ struct QuotaTierListView: View {
                     .padding(.top, 16)
             } else {
                 VStack {
-                    NotificationBanner(
-                        type: .info,
-                        message: "Could not initialize QuotaTierListSubView with current inputs"
-                    )
-
-                    NotificationBanner(
-                        type: .warning,
-                        message: message
-                    )
+                    NotificationBanner(type: .info,
+                            message: "Loading tiers…")
+                    NotificationBanner(type: .warning,
+                            message: message)
+                }
+                .onAppear {
+                    do {
+                        self.tiers = try quota.tiers()
+                    } catch {
+                        self.message = error.localizedDescription
+                    }
                 }
             }
         }
@@ -149,24 +141,64 @@ private struct TableBlock: View {
     let valuesFor: (QuotaTierContent) -> [(String, Double)]
     let textColor: Color
 
+    private var allRows: [String]            // row names, e.g. ["prognosis", "suggestion", …]
+    private var tierValueMatrix: [[Double]]  // tierValueMatrix[rowIndex][tierIndex]
+    private var isPrognosisRow: [Bool]       // true if the “String” is “prognosis”
+
+    init(
+        rowLabelWidth: CGFloat,
+        tiers: [QuotaTierContent],
+        valuesFor: @escaping (QuotaTierContent) -> [(String, Double)],
+        textColor: Color
+    ) {
+        self.rowLabelWidth = rowLabelWidth
+        self.tiers = tiers
+        self.valuesFor = valuesFor
+        self.textColor = textColor
+
+        let firstTuples = valuesFor(tiers.first!)
+        self.allRows = firstTuples.map { $0.0 }
+        self.isPrognosisRow = firstTuples.map { $0.0 == "prognosis" }
+
+        var matrix: [[Double]] = Array(
+            repeating: [Double](),
+            count: firstTuples.count
+        )
+        for (tierIndex, tierContent) in tiers.enumerated() {
+            let tuples = valuesFor(tierContent) // e.g. [("prognosis", 12.34), ("suggestion", 8.90), …]
+            for rowIndex in 0 ..< tuples.count {
+                let value = tuples[rowIndex].1
+                if tierIndex == 0 {
+                    matrix[rowIndex].append(value)
+                } else {
+                    matrix[rowIndex].append(value)
+                }
+            }
+        }
+        self.tierValueMatrix = matrix
+    }
+
     var body: some View {
         VStack(spacing: 8) {
-            ForEach(Array(valuesFor(tiers.first!).map { $0.0 }.indices), id: \.self) { rowIndex in
+            ForEach(allRows.indices, id: \.self) { rowIndex in
                 HStack(spacing: 4) {
-                    // 1) Row label (“prognosis”, “suggestion”, “base”)
-                    Text(valuesFor(tiers.first!)[rowIndex].0)
-                        .font(.subheadline)
-                        .frame(width: rowLabelWidth, alignment: .leading)
-                        .foregroundStyle(textColor)
+                let label = allRows[rowIndex]
+                Text(label)
+                .font(.subheadline)
+                .frame(width: rowLabelWidth,
+                        alignment: .leading)
+                .foregroundStyle(textColor)
 
-                    // 2) For each tier, show that tier’s matching value
-                    ForEach(tiers, id: \.tier) { content in
-                        let entry = valuesFor(content)[rowIndex]
-                        let str = String(format: "%.2f", entry.1)
-                        let displayed = (entry.0 == "prognosis") ? "(\(str))" : str
+                    ForEach(Array(tiers.indices), id: \.self) { tierIndex in
+                        let rawValue = tierValueMatrix[rowIndex][tierIndex]
+                        let str      = String(format: "%.2f", rawValue)
+                        let displayed = isPrognosisRow[rowIndex]
+                        ? "(\(str))"
+                        : str
+
                         Text(displayed)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .foregroundStyle(textColor)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .foregroundStyle(textColor)
                     }
                 }
             }
@@ -174,7 +206,6 @@ private struct TableBlock: View {
     }
 }
 
-/// A small helper to render a label + numeric value side by side.
 private struct StatView: View {
     let label: String
     let value: Double
