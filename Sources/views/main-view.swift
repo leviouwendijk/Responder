@@ -167,7 +167,7 @@ struct Responder: View {
         VStack {
             HStack {
                 MailerAPIPathSelectionView(viewModel: apiPathVm)
-                .frame(width: 500)
+                .frame(width: 400)
 
                 VariablesView(
                     contactsVm:        contactsVm,
@@ -204,7 +204,7 @@ struct Responder: View {
                     clearContact:      { clearContact() },
                 )
                 .equatable()
-                .frame(minWidth: 500)
+                .frame(minWidth: 380)
 
 
                 Divider()

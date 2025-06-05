@@ -7,7 +7,7 @@
       "location" : "https://github.com/leviouwendijk/Compositions.git",
       "state" : {
         "branch" : "master",
-        "revision" : "db18ca38dfadceb62d5f953681be06dae599e2f0"
+        "revision" : "6c7fd0d7fffaeb3987dc3ad031e2d54a72236571"
       }
     },
     {
@@ -61,7 +61,7 @@
       "location" : "https://github.com/leviouwendijk/ViewComponents.git",
       "state" : {
         "branch" : "master",
-        "revision" : "7455ef9ad590a16f9b01402c2e7ff49f408d8c40"
+        "revision" : "cb7b1a53a13e4257554243b067f8223e53c43038"
       }
     }
   ],
