@@ -6,12 +6,17 @@ import ViewComponents
 struct QuotaTierListView: View {
     let quota: CustomQuota
     private var tiers: [QuotaTierContent]? = nil
+    private var message: String = ""
 
     init(
         quota: CustomQuota
     ) {
         self.quota = quota
-        self.tiers = try? quota.tiers()
+        do {
+            self.tiers = try quota.tiers()
+        } catch {
+            self.message = error.localizedDescription
+        }
     }
 
     var body: some View {
@@ -20,10 +25,17 @@ struct QuotaTierListView: View {
                 QuotaTierListSubView(tiers: t)
                     .padding(.top, 16)
             } else {
-                NotificationBanner(
-                    type: .info,
-                    message: "Could not initialize QuotaTierListSubView with current inputs"
-                )
+                VStack {
+                    NotificationBanner(
+                        type: .info,
+                        message: "Could not initialize QuotaTierListSubView with current inputs"
+                    )
+
+                    NotificationBanner(
+                        type: .warning,
+                        message: message
+                    )
+                }
             }
         }
     }

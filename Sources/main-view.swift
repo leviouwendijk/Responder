@@ -595,6 +595,14 @@ struct Responder: View {
                             ProgressView("Computing quota…")
                                 .padding(.top, 16)
                         }
+
+                        if !(quotaVm.errorMessage.isEmpty) {
+                            NotificationBanner(
+                                type: .info,
+                                message: quotaVm.errorMessage
+                            )
+                        }
+
                         else if let quota = quotaVm.loadedQuota {
                             QuotaTierListView(quota: quota)
                                 .padding(.top, 16)
