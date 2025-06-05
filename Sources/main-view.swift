@@ -166,11 +166,6 @@ struct Responder: View {
     @StateObject private var combinedPdfNotifier: NotificationBannerController = NotificationBannerController()
     @StateObject private var remotePdfNotifier: NotificationBannerController = NotificationBannerController()
 
-    @StateObject private var copyQuotaNotifier: NotificationBannerController = NotificationBannerController(
-        contents: [NotificationBannerControllerContents(title: "copied", style: .success, message: "output copied")],
-        addingDefaultContents: true
-    )
-
     private var clientIdentifier: String {
         let c = client.isEmpty ? "{client}" : client
         let d = dog.isEmpty ? "{dog}": dog
@@ -617,20 +612,11 @@ struct Responder: View {
                             HStack(alignment: .center, spacing: 45) {
                                 // Spacer()
 
-                                StandardNotifyingButton(
-                                    type: .copy,
-                                    title: "set",
-                                    action: {
-                                        if let table = try? quotaVm.loadedQuota?.quotaSummary(clientIdentifier: clientIdentifier) {
-                                            copyToClipboard(table)
-                                            copyQuotaNotifier.setAndNotify(to: "copied")
-                                        } else {
-                                            copyQuotaNotifier.setAndNotify(to: "error")
-                                        }
-                                    },
-                                    notifier: copyQuotaNotifier,
-                                    notifierPosition: .under
+                                SelectableTierView(
+                                    quota: quota,
+                                    clientIdentifier: clientIdentifier
                                 )
+
 
                                 VStack {
                                     StandardButton(
