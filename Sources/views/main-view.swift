@@ -7,6 +7,7 @@ import Economics
 import Compositions
 import ViewComponents
 import Interfaces
+import Implementations
 
 struct TemplateFetchResponse: Decodable {
     let success: Bool
@@ -163,76 +164,88 @@ struct Responder: View {
     }
 
     var body: some View {
-        HStack {
-            MailerAPIPathSelectionView(viewModel: apiPathVm)
-            .frame(width: 500)
+        VStack {
+            HStack {
+                MailerAPIPathSelectionView(viewModel: apiPathVm)
+                .frame(width: 500)
 
-            VariablesView(
-                contactsVm:        contactsVm,
-                apiPathVm:         apiPathVm,
-                invoiceVm:         invoiceVm,
+                VariablesView(
+                    contactsVm:        contactsVm,
+                    apiPathVm:         apiPathVm,
+                    invoiceVm:         invoiceVm,
 
-                local:              $local,
-                selectedContact:    $selectedContact,
-                client:             $client,
-                dog:                $dog,
-                email:              $email,
-                location:           $location,
-                areaCode:           $areaCode,
-                street:             $street,
-                number:             $number,
-                localLocation:      $localLocation,
+                    local:              $local,
+                    selectedContact:    $selectedContact,
+                    client:             $client,
+                    dog:                $dog,
+                    email:              $email,
+                    location:           $location,
+                    areaCode:           $areaCode,
+                    street:             $street,
+                    number:             $number,
+                    localLocation:      $localLocation,
 
-                fetchableCategory:  $fetchableCategory,
-                fetchableFile:      $fetchableFile,
+                    fetchableCategory:  $fetchableCategory,
+                    fetchableFile:      $fetchableFile,
 
-                subject:            $subject,
-                fetchedHtml:        $fetchedHtml,
+                    subject:            $subject,
+                    fetchedHtml:        $fetchedHtml,
 
-                selectedWAMessage:  $selectedWAMessage,
+                    selectedWAMessage:  $selectedWAMessage,
 
-                anyInvalidConditionsCheck:   anyInvalidConditionsCheck,
-                emptyEmailWarning:           emptyEmailWarning,
-                emptySubjectWarning:         emptySubjectWarning,
-                finalHtmlContainsRawVariables: finalHtmlContainsRawVariables,
-                selectedWAMessageReplaced:     selectedWAMessageReplaced,
-                waMessageContainsRawPlaceholders: waMessageContainsRawPlaceholders,
+                    anyInvalidConditionsCheck:   anyInvalidConditionsCheck,
+                    emptyEmailWarning:           emptyEmailWarning,
+                    emptySubjectWarning:         emptySubjectWarning,
+                    finalHtmlContainsRawVariables: finalHtmlContainsRawVariables,
+                    selectedWAMessageReplaced:     selectedWAMessageReplaced,
+                    waMessageContainsRawPlaceholders: waMessageContainsRawPlaceholders,
 
-                sendMailerEmail:   { try sendMailerEmail() },
-                clearContact:      { clearContact() },
-            )
-            .equatable()
-            .frame(minWidth: 500)
+                    sendMailerEmail:   { try sendMailerEmail() },
+                    clearContact:      { clearContact() },
+                )
+                .equatable()
+                .frame(minWidth: 500)
 
 
-            Divider()
+                Divider()
 
-            ValuesPaneView(
-                apiPathVm:           apiPathVm,
-                weeklyScheduleVm:    weeklyScheduleVm,
-                quotaVm:             quotaVm,
+                ValuesPaneView(
+                    apiPathVm:           apiPathVm,
+                    weeklyScheduleVm:    weeklyScheduleVm,
+                    quotaVm:             quotaVm,
 
-                subject:             $subject,
-                fetchedHtml:         $fetchedHtml,
-                includeQuoteInCustomMessage: $includeQuoteInCustomMessage,
+                    subject:             $subject,
+                    fetchedHtml:         $fetchedHtml,
+                    includeQuoteInCustomMessage: $includeQuoteInCustomMessage,
 
-                showSuccessBanner:    $showSuccessBanner,
+                    // showSuccessBanner:    $showSuccessBanner,
+                    // successBannerMessage: $successBannerMessage,
+                    // bannerColor:          $bannerColor,
+                    // isSendingEmail:       $isSendingEmail,
+
+                    anyInvalidConditionsCheck:    anyInvalidConditionsCheck,
+                    emptySubjectWarning:          emptySubjectWarning,
+                    finalHtmlContainsRawVariables: finalHtmlContainsRawVariables,
+
+                    clientIdentifier:              clientIdentifier,
+
+                    sendMailerEmail:    { try sendMailerEmail() }
+                )
+                .equatable()
+                .frame(minWidth: 500)
+            }
+            .padding()
+
+            ExecuteMailerView(
+                isSendingEmail:      $isSendingEmail,
+                showSuccessBanner:   $showSuccessBanner,
                 successBannerMessage: $successBannerMessage,
-                bannerColor:          $bannerColor,
-                isSendingEmail:       $isSendingEmail,
-
-                anyInvalidConditionsCheck:    anyInvalidConditionsCheck,
-                emptySubjectWarning:          emptySubjectWarning,
-                finalHtmlContainsRawVariables: finalHtmlContainsRawVariables,
-
-                clientIdentifier:              clientIdentifier,
-
-                sendMailerEmail:    { try sendMailerEmail() }
+                bannerColor:         $bannerColor,
+                sendMailerEmail:     { try sendMailerEmail() }
             )
             .equatable()
-            .frame(minWidth: 500)
+            .padding(.top, 8)
         }
-        .padding()
     }
 
     private func cleanThisView() {

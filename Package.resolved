@@ -1,5 +1,5 @@
 {
-  "originHash" : "bd233f743c7cbf2c5a270ad4c4ebf0879e644cd7aac2a1c0214d51221cc0063e",
+  "originHash" : "3b597bd762e7b75c7f6fa011511f37b6c563167d17e71f9eaf38b60d46cb5347",
   "pins" : [
     {
       "identity" : "compositions",
@@ -7,7 +7,7 @@
       "location" : "https://github.com/leviouwendijk/Compositions.git",
       "state" : {
         "branch" : "master",
-        "revision" : "bfe80e20c5d8c361836ee60ef2d83cbc3e57e998"
+        "revision" : "db18ca38dfadceb62d5f953681be06dae599e2f0"
       }
     },
     {
@@ -16,7 +16,16 @@
       "location" : "https://github.com/leviouwendijk/Economics.git",
       "state" : {
         "branch" : "master",
-        "revision" : "54248ca1fe9ee6ad2de99dc3ca3bb61324d3be0b"
+        "revision" : "a47cbbc6632a23cff8dad68fa0e81733bfd3a71c"
+      }
+    },
+    {
+      "identity" : "implementations",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Implementations.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "897b082133291655bb54aafe47c60c0e45c4e8f9"
       }
     },
     {
@@ -25,7 +34,7 @@
       "location" : "https://github.com/leviouwendijk/Interfaces.git",
       "state" : {
         "branch" : "master",
-        "revision" : "81dcea8652d204885e7a23ae6eba24951a34c4e6"
+        "revision" : "a98c25f2b5d34130ef5615915b43f9342b91d594"
       }
     },
     {
@@ -38,12 +47,21 @@
       }
     },
     {
+      "identity" : "structures",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Structures.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "a4b6ab7dcbe90134c491a091ef7915adc37b46d9"
+      }
+    },
+    {
       "identity" : "viewcomponents",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/leviouwendijk/ViewComponents.git",
       "state" : {
         "branch" : "master",
-        "revision" : "9aab8b530410c8ef1a7818057ee8952debd9da6a"
+        "revision" : "7455ef9ad590a16f9b01402c2e7ff49f408d8c40"
       }
     }
   ],
