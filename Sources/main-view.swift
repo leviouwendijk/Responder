@@ -597,10 +597,17 @@ struct Responder: View {
                         }
 
                         if !(quotaVm.errorMessage.isEmpty) {
-                            NotificationBanner(
-                                type: .info,
-                                message: quotaVm.errorMessage
-                            )
+                            if quotaVm.hasEmptyInputs {
+                                NotificationBanner(
+                                    type: .info,
+                                    message: "Enter inputs"
+                                )
+                            } else {
+                                NotificationBanner(
+                                    type: .warning,
+                                    message: quotaVm.errorMessage
+                                )
+                            }
                         }
 
                         else if let quota = quotaVm.loadedQuota {
