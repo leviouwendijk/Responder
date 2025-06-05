@@ -201,6 +201,7 @@ struct Responder: View {
                 sendMailerEmail:   { try sendMailerEmail() },
                 clearContact:      { clearContact() },
             )
+            .equatable()
             .frame(minWidth: 500)
 
 
@@ -228,6 +229,7 @@ struct Responder: View {
 
                 sendMailerEmail:    { try sendMailerEmail() }
             )
+            .equatable()
             .frame(minWidth: 500)
         }
         .padding()
