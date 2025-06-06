@@ -8,8 +8,7 @@ import Interfaces
 
 @main
 struct ResponderApp: App {
-    @StateObject private var mailerViewModel = MailerViewModel()
-    @StateObject private var invoiceVm = MailerAPIInvoiceVariablesViewModel()
+    @StateObject private var viewmodel = ResponderViewModel()
 
     init() {
         NSWindow.allowsAutomaticWindowTabbing = false
@@ -22,19 +21,24 @@ struct ResponderApp: App {
             VStack {
                 TabView(selection: $selectedTab) {
                     Responder()
-                      .environmentObject(mailerViewModel)
-                      .environmentObject(invoiceVm)
+                      .environmentObject(viewmodel)
                       .tabItem {
-                        Label("Responder", systemImage: "paperplane.fill")
+                          Label("Mailer", systemImage: "paperplane.fill")
                       }
                       .tag(0)
 
-                    MailerStandardOutput()
-                      .environmentObject(mailerViewModel)
+                    QuotaView(viewmodel: viewmodel)
                       .tabItem {
-                        Label("stdout", systemImage: "terminal.fill")
+                          Label("Quota", systemImage: "terminal.fill")
                       }
                       .tag(1)
+
+                    MailerStandardOutput()
+                      .environmentObject(viewmodel)
+                      .tabItem {
+                          Label("stdout", systemImage: "terminal.fill")
+                      }
+                      .tag(2)
                 }
 
                 BuildInformationSwitch(

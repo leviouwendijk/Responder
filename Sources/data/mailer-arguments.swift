@@ -2,7 +2,7 @@ import Foundation
 import Interfaces
 import plate
 
-struct StateVariables {
+struct MailerCLIStateVariables {
     let invoiceId: String
     let fetchableCategory: String
     let fetchableFile: String
@@ -12,11 +12,11 @@ struct StateVariables {
     let includeQuote: Bool
 } 
 
-enum ArgError: Error {
+enum MailerCLIArgError: Error {
     case missingArgumentComponents
 }
 
-struct MailerArguments {
+struct MailerCLIArguments {
     let client: String
     let email: String
     let dog: String
@@ -24,11 +24,11 @@ struct MailerArguments {
     let endpoint: MailerAPIEndpoint?
     let availabilityJSON: String?
     let needsAvailability: Bool
-    let stateVariables: StateVariables
+    let stateVariables: MailerCLIStateVariables
 
     func string(_ includeBinaryName: Bool = false) throws -> String {
         guard let r = route, let e = endpoint else {
-            throw ArgError.missingArgumentComponents
+            throw MailerCLIArgError.missingArgumentComponents
         }
 
         var components: [String] = []
@@ -74,7 +74,7 @@ struct MailerArguments {
     }
 }
 
-func executeMailer(_ arguments: String) throws {
+public func executeMailerCLI(_ arguments: String) throws {
     do {
         let home = Home.string()
         let process = Process()
