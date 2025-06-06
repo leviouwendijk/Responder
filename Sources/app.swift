@@ -29,7 +29,7 @@ struct ResponderApp: App {
 
                     QuotaView(viewmodel: viewmodel)
                       .tabItem {
-                          Label("Quota", systemImage: "terminal.fill")
+                          Label("Quota", systemImage: "list.bullet")
                       }
                       .tag(1)
 
@@ -40,6 +40,8 @@ struct ResponderApp: App {
                       }
                       .tag(2)
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
 
                 BuildInformationSwitch(
                     alignment: .center,
