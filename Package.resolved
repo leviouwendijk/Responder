@@ -7,7 +7,7 @@
       "location" : "https://github.com/leviouwendijk/Compositions.git",
       "state" : {
         "branch" : "master",
-        "revision" : "7acdeb250319cefdcdbd4120e9c0cf9b0041cfc5"
+        "revision" : "6f61f7449e0c01c42ebfefc2f00393df911da92e"
       }
     },
     {
@@ -16,7 +16,7 @@
       "location" : "https://github.com/leviouwendijk/Economics.git",
       "state" : {
         "branch" : "master",
-        "revision" : "22b9f080d492616fcf9079595aa17f832bc71099"
+        "revision" : "5ad98b7251be99473f7876b5be963164336ee410"
       }
     },
     {
@@ -25,7 +25,7 @@
       "location" : "https://github.com/leviouwendijk/Implementations.git",
       "state" : {
         "branch" : "master",
-        "revision" : "948e7fbc644a33051a312ebb6ec769e0d5b834dc"
+        "revision" : "19bb90225b3c242b3a363e2788119b3cdcf3094a"
       }
     },
     {
@@ -52,7 +52,7 @@
       "location" : "https://github.com/leviouwendijk/Structures.git",
       "state" : {
         "branch" : "master",
-        "revision" : "51a6f7cde4036cc47cdece8fb7e857f305cd026a"
+        "revision" : "2074a351da3751bde391951a70bacbc08091d180"
       }
     },
     {
