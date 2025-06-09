@@ -21,22 +21,23 @@ struct Responder: View {
                 .frame(width: 450)
 
                 VariablesView(
-                    viewmodel: viewmodel
+                    // viewmodel: viewmodel
                 )
+                // .environmentObject(viewmodel)
                 .frame(minWidth: 380)
 
                 Divider()
 
-                ValuesPaneView(
-                    viewmodel: viewmodel
-                )
+                ValuesPaneView()
+                // .environmentObject(viewmodel)
                 .frame(minWidth: 400)
             }
             .padding()
 
             ExecuteMailerView(
-                viewmodel: viewmodel
+                // viewmodel: viewmodel
             )
+            .environmentObject(viewmodel)
             .padding(.top, 8)
         }
     }

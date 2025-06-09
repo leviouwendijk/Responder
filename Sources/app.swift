@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import plate
 import Interfaces
@@ -12,6 +13,7 @@ struct ResponderApp: App {
 
     init() {
         NSWindow.allowsAutomaticWindowTabbing = false
+        print("ResVM created at \(Unmanaged.passUnretained(viewmodel).toOpaque())")
     }
 
     @State private var selectedTab: Int = 0
@@ -27,7 +29,9 @@ struct ResponderApp: App {
                       }
                       .tag(0)
 
-                    QuotaView(viewmodel: viewmodel)
+                    // QuotaView(viewmodel: viewmodel)
+                    QuotaView()
+                      .environmentObject(viewmodel)
                       .tabItem {
                           Label("Quota", systemImage: "list.bullet")
                       }
