@@ -11,9 +11,17 @@ import Interfaces
 struct ResponderApp: App {
     @StateObject private var viewmodel = ResponderViewModel()
 
+    public var errorMessage = ""
+
     init() {
         NSWindow.allowsAutomaticWindowTabbing = false
         print("ResVM created at \(Unmanaged.passUnretained(viewmodel).toOpaque())")
+        do {
+            try prepareEnvironment()
+        } catch {
+            print(error)
+            self.errorMessage = error.localizedDescription
+        }
     }
 
     @State private var selectedTab: Int = 0
@@ -46,6 +54,12 @@ struct ResponderApp: App {
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
+
+                NotificationBanner(
+                    type: .error,
+                    message: self.errorMessage
+                )
+                .hide(when: self.errorMessage.isEmpty)
 
                 BuildInformationSwitch(
                     alignment: .center,
