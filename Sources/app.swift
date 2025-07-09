@@ -15,7 +15,7 @@ struct ResponderApp: App {
 
     init() {
         NSWindow.allowsAutomaticWindowTabbing = false
-        print("ResVM created at \(Unmanaged.passUnretained(viewmodel).toOpaque())")
+        // print("ResVM created at \(Unmanaged.passUnretained(viewmodel).toOpaque())")
         do {
             try prepareEnvironment()
         } catch {
