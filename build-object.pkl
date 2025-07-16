@@ -4,7 +4,7 @@ type = "application"
 version {
     major = 4
     minor = 4
-    patch = 13
+    patch = 14
 }
 details = "Interface for custom mailer API"
 author = "Levi Ouwendijk"
