@@ -51,6 +51,12 @@ struct ResponderApp: App {
                           Label("stdout", systemImage: "terminal.fill")
                       }
                       .tag(2)
+
+                    CodeAndPreviewView()
+                      .tabItem {
+                          Label("lab", systemImage: "terminal.fill")
+                      }
+                      .tag(3)
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
