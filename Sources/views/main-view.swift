@@ -14,25 +14,27 @@ struct Responder: View {
 
     var body: some View {
         VStack {
-            HStack {
-                MailerAPIPathSelectionView(
-                    viewModel: viewmodel.apiPathVm
-                )
-                .frame(width: 450)
+            // ScrollView { // adding scrollview for various resolutions
+                HStack {
+                    MailerAPIPathSelectionView(
+                        viewModel: viewmodel.apiPathVm
+                    )
+                    .frame(width: 450)
 
-                VariablesView(
-                    // viewmodel: viewmodel
-                )
-                // .environmentObject(viewmodel)
-                .frame(minWidth: 380)
+                    VariablesView(
+                        // viewmodel: viewmodel
+                    )
+                    // .environmentObject(viewmodel)
+                    .frame(minWidth: 380)
 
-                Divider()
+                    Divider()
 
-                ValuesPaneView()
-                // .environmentObject(viewmodel)
-                .frame(minWidth: 400)
-            }
-            .padding()
+                    ValuesPaneView()
+                    // .environmentObject(viewmodel)
+                    .frame(minWidth: 400)
+                }
+                .padding()
+            // }
 
             ExecuteMailerView(
                 // viewmodel: viewmodel
