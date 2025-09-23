@@ -14,7 +14,6 @@ struct Responder: View {
 
     var body: some View {
         VStack {
-            // ScrollView { // adding scrollview for various resolutions
                 HStack {
                     MailerAPIPathSelectionView(
                         viewModel: viewmodel.apiPathVm
@@ -34,7 +33,6 @@ struct Responder: View {
                     .frame(minWidth: 400)
                 }
                 .padding()
-            // }
 
             ExecuteMailerView(
                 // viewmodel: viewmodel
