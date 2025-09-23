@@ -48,7 +48,7 @@ struct ResponderApp: App {
                     MailerStandardOutput()
                       .environmentObject(viewmodel)
                       .tabItem {
-                          Label("stdout", systemImage: "terminal.fill")
+                          Label("request_log", systemImage: "terminal.fill")
                       }
                       .tag(2)
 
