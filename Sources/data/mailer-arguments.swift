@@ -101,7 +101,7 @@ public func executeMailerCLI(_ arguments: String) throws {
             throw NSError(domain: "mailer", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: errorString])
         }
     } catch {
-        print("Error running commands: \(error)")
+        print("Error running commands: \(error.localizedDescription)")
         throw error
     }
 }
