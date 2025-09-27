@@ -12,3 +12,8 @@ DerivedData/
 Responder.app/Contents/MacOS/Responder
 Responder.app/
 Package.resolved
+
+# auto-added ignorables:
+compiled.pkl
+/compiled.pkl
+**/compiled.pkl
