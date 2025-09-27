@@ -1,18 +1,10 @@
 uuid = "7CE0B3DF-DCAF-4766-BB13-38790EB6C604"
 name = "Responder"
-types {
-    "application"
-}
-versions {
-    release {
-        major = 4
-        minor = 6
-        patch = 13
-    }
-}
-compile {
-    use = false
-    arguments {  }
+type = "application"
+version {
+    major = 4
+    minor = 6
+    patch = 12
 }
 details = "Interface for custom mailer API"
 author = "Levi Ouwendijk"
