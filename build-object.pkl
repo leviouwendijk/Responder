@@ -11,8 +11,8 @@ versions {
     }
 }
 compile {
-    use = false
-    arguments {  }
+    use = true
+    arguments { "--local" }
 }
 details = "Interface for custom mailer API"
 author = "Levi Ouwendijk"
