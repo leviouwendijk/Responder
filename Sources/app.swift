@@ -39,9 +39,6 @@ struct ResponderApp: App {
                       .onAppear {
                           viewmodel.messagesStore.add(messages: messages)
                       }
-                    // .onChange(of: viewmodel.selectedMessageKey) { old, new in
-                    //     errorMessage = "selectedMessageKey changed → [\(new ?? "nil")]"
-                    // }
                       .tag(0)
 
                     // QuotaView(viewmodel: viewmodel)

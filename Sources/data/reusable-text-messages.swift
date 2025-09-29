@@ -2,8 +2,6 @@ import Foundation
 import plate
 import Structures
 
-// let messageStore: ReusableTextMessageStore = .init(
-    // messages: [
 let messages = [
     ReusableTextMessageObject(
         key: "called_variation_i",
@@ -133,4 +131,3 @@ let messages = [
         )
     ),
 ]
-// )
