@@ -11,6 +11,7 @@ import Interfaces
 struct ResponderApp: App {
     @StateObject private var viewmodel = ResponderViewModel()
 
+    // @State public var errorMessage = ""
     public var errorMessage = ""
 
     init() {
@@ -38,6 +39,9 @@ struct ResponderApp: App {
                       .onAppear {
                           viewmodel.messagesStore.add(messages: messages)
                       }
+                    // .onChange(of: viewmodel.selectedMessageKey) { old, new in
+                    //     errorMessage = "selectedMessageKey changed → [\(new ?? "nil")]"
+                    // }
                       .tag(0)
 
                     // QuotaView(viewmodel: viewmodel)
