@@ -35,6 +35,9 @@ struct ResponderApp: App {
                       .tabItem {
                           Label("Mailer", systemImage: "paperplane.fill")
                       }
+                      .onAppear {
+                          viewmodel.messagesStore.add(messages: messages)
+                      }
                       .tag(0)
 
                     // QuotaView(viewmodel: viewmodel)

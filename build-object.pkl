@@ -7,7 +7,7 @@ versions {
     release {
         major = 4
         minor = 6
-        patch = 14
+        patch = 15
     }
 }
 compile {
