@@ -120,7 +120,7 @@ let messages = [
                 
                     Conform onze algemene voorwaarden (https://hondenmeesters.nl/algemene-voorwaarden.html) en privacy beleid (https://hondenmeesters.nl/privacy-beleid.html).
                 
-                Zodra akkoord zullen wij de afspraken in onze agenda definitief maken en bevestigen, zowel als het bedrag factureren.
+                Bevestig eenvoudig door “Akkoord” te antwoorden.  
                 
                 Mocht je vragen of aanmerkingen hebben, leg deze dan gerust aan ons voor.
                 
