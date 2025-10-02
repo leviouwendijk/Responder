@@ -49,18 +49,25 @@ struct ResponderApp: App {
                       }
                       .tag(1)
 
+                    PostcodeLookupView()
+                      // .environmentObject(viewmodel)
+                      .tabItem {
+                          Label("Postcode", systemImage: "list.bullet")
+                      }
+                      .tag(2)
+
                     MailerStandardOutput()
                       .environmentObject(viewmodel)
                       .tabItem {
                           Label("request_log", systemImage: "terminal.fill")
                       }
-                      .tag(2)
+                      .tag(3)
 
                     CodeAndPreviewView()
                       .tabItem {
                           Label("lab", systemImage: "terminal.fill")
                       }
-                      .tag(3)
+                      .tag(4)
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
