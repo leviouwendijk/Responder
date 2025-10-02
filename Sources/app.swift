@@ -42,14 +42,14 @@ struct ResponderApp: App {
                       .tag(0)
 
                     // QuotaView(viewmodel: viewmodel)
-                    QuotaView()
+                    QuotaView(quotaVm: viewmodel.quotaVm)
                       .environmentObject(viewmodel)
                       .tabItem {
                           Label("Quota", systemImage: "list.bullet")
                       }
                       .tag(1)
 
-                    PostcodeLookupView()
+                    PostcodeLookupView(viewmodel: viewmodel.postcodeVm)
                       // .environmentObject(viewmodel)
                       .tabItem {
                           Label("Postcode", systemImage: "list.bullet")
