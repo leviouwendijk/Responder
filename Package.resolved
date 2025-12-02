@@ -16,7 +16,7 @@
       "location" : "https://github.com/leviouwendijk/Compositions.git",
       "state" : {
         "branch" : "master",
-        "revision" : "da64393292e95a71dda55cf41bc2d35a1ac5a6bb"
+        "revision" : "d32d52fac35c17ce2727c3cd04a70b4400c5e2f2"
       }
     },
     {
@@ -43,7 +43,7 @@
       "location" : "https://github.com/leviouwendijk/Implementations.git",
       "state" : {
         "branch" : "master",
-        "revision" : "d3cad53e876066e300a7ddfccbda4bdf2aa3aa3c"
+        "revision" : "fe5d7abf0ef05c94692ba1d1656ef3ee10c0d99a"
       }
     },
     {
@@ -52,7 +52,7 @@
       "location" : "https://github.com/leviouwendijk/Interfaces.git",
       "state" : {
         "branch" : "master",
-        "revision" : "dfbc9dfcbcd3641fec630f2425ac1b198c2265aa"
+        "revision" : "eca3e4ba9896a8f443de857c7ca3cb16e3393245"
       }
     },
     {
@@ -61,7 +61,7 @@
       "location" : "https://github.com/leviouwendijk/plate.git",
       "state" : {
         "branch" : "master",
-        "revision" : "2e59f7905c6433efb9f2bbd1e24704eb7766ac6e"
+        "revision" : "a93930a7a963b1a9756a4708a32980f27b6cc996"
       }
     },
     {
