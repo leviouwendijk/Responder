@@ -1,0 +1,3987 @@
++------------------------------------------------------+
+| Sources/_concept/data-structs/allocations-type.swift |
++------------------------------------------------------+
+import Foundation
+
+public struct SessionAllocation: Sendable, Codable, Hashable {
+    public var minutes: MinuteRange
+
+    public init(minutes: MinuteRange) {
+        self.minutes = minutes
+    }
+
+    public init(sessions: SessionRange) {
+        self.minutes = sessions.minute_range()
+    }
+}
+
+public struct MinuteRange: Sendable, Codable, Hashable {
+    public var low: Int
+    public var medium: Int?
+    public var high: Int
+
+    public init(low: Int, medium: Int? = nil, high: Int? = nil) {
+        let lo = max(0, low)
+        let hi = max(0, high ?? low)
+
+        self.low = lo
+        self.high = hi
+
+        if let m = medium {
+            self.medium = max(lo, min(hi, m))
+        } else {
+            self.medium = nil
+        }
+    }
+
+    /// Precise sessions (Double) for UI display.
+    public func session_range(session_duration: Int = 60) -> SessionRange {
+        let d = Double(max(session_duration, 1))
+        return .init(
+            low: Double(self.low) / d,
+            medium: self.medium.map { Double($0) / d },
+            high: Double(self.high) / d
+        )
+    }
+
+    /// Medium value used when medium is nil (keeps downstream code simple).
+    public func effectiveMedium() -> Int {
+        if let medium { return medium }
+        return (low + high) / 2
+    }
+}
+
+public struct SessionRange: Sendable, Codable, Hashable {
+    public var low: Double
+    public var medium: Double?
+    public var high: Double
+
+    public init(low: Double, medium: Double? = nil, high: Double? = nil) {
+        self.low = low
+        self.medium = medium
+        self.high = high ?? low
+    }
+
+    public func minute_range(session_duration: Int = 60) -> MinuteRange {
+        let d = Double(max(session_duration, 1))
+        return .init(
+            low: Int((self.low * d).rounded(.toNearestOrAwayFromZero)),
+            medium: self.medium.map { Int(($0 * d).rounded(.toNearestOrAwayFromZero)) },
+            high: Int((self.high * d).rounded(.toNearestOrAwayFromZero))
+        )
+    }
+
+    /// Integer view of the session range for tallying (nearest).
+    public var rounded: Rounded {
+        Rounded(
+            low: Int(self.low.rounded(.toNearestOrAwayFromZero)),
+            medium: self.medium.map { Int($0.rounded(.toNearestOrAwayFromZero)) },
+            high: Int(self.high.rounded(.toNearestOrAwayFromZero))
+        )
+    }
+
+    public var floored: Rounded {
+        Rounded(
+            low: Int(self.low.rounded(.down)),
+            medium: self.medium.map { Int($0.rounded(.down)) },
+            high: Int(self.high.rounded(.down))
+        )
+    }
+
+    public var ceiled: Rounded {
+        Rounded(
+            low: Int(self.low.rounded(.up)),
+            medium: self.medium.map { Int($0.rounded(.up)) },
+            high: Int(self.high.rounded(.up))
+        )
+    }
+
+    /// Medium value used when medium is nil (keeps downstream code simple).
+    public func effectiveMedium() -> Double {
+        if let medium { return medium }
+        return (low + high) / 2.0
+    }
+
+    public struct Rounded: Sendable, Codable, Hashable {
+        public var low: Int
+        public var medium: Int?
+        public var high: Int
+
+        public init(low: Int, medium: Int?, high: Int) {
+            self.low = low
+            self.medium = medium
+            self.high = high
+        }
+
+        public func effectiveMedium() -> Int {
+            if let medium { return medium }
+            return (low + high) / 2
+        }
+    }
+}
+
+public struct AllocationSummary: Sendable, Hashable {
+    public var minutesText: String
+    public var sessionsText: String?
+
+    public init(minutesText: String, sessionsText: String?) {
+        self.minutesText = minutesText
+        self.sessionsText = sessionsText
+    }
+}
+
+public extension SessionAllocation {
+    /// UI summary (minutes always, sessions with up to 2 decimals).
+    /// Sessions shown are low–high; medium is intentionally not shown here.
+    func summary(sessionDuration: Int = 60) -> AllocationSummary {
+        let lo = minutes.low
+        let hi = minutes.high
+
+        let minutesText: String = {
+            if lo == hi { return "\(lo) min" }
+            return "\(lo)–\(hi) min"
+        }()
+
+        let sessionsText: String? = {
+            if lo == 0 && hi == 0 { return nil }
+
+            let s = minutes.session_range(session_duration: sessionDuration)
+
+            if nearlyEqual(s.low, s.high) {
+                return "\(formatSessions(s.low)) sess"
+            }
+
+            return "\(formatSessions(s.low))–\(formatSessions(s.high)) sess"
+        }()
+
+        return AllocationSummary(minutesText: minutesText, sessionsText: sessionsText)
+    }
+}
+
+public func formatSessions(_ value: Double) -> String {
+    // Up to 2 decimals, but trim trailing zeros and the dot if needed.
+    let raw = String(format: "%.2f", value)
+
+    var s = raw
+    while s.contains(".") && (s.hasSuffix("0") || s.hasSuffix(".")) {
+        if s.hasSuffix("0") {
+            s.removeLast()
+            continue
+        }
+        if s.hasSuffix(".") {
+            s.removeLast()
+            break
+        }
+    }
+    return s
+}
+
+public func nearlyEqual(_ a: Double, _ b: Double, epsilon: Double = 0.0000001) -> Bool {
+    abs(a - b) <= epsilon
+}
+
+(!): 1 blank lines
+
+
++--------------------------------------------------+
+| Sources/_concept/data-structs/lessons-type.swift |
++--------------------------------------------------+
+import Foundation
+
+public enum LessonFormat: String, Sendable, Codable, Hashable, CaseIterable {
+    case preparation
+    case equipment
+    case comprehension
+    case practice
+    case exercise
+    case demonstration
+}
+
+public extension LessonFormat {
+    struct LessonFormatData: Sendable, Hashable {
+        public let title: String
+
+        public init(title: String) {
+            self.title = title
+        }
+    }
+
+    var data: LessonFormatData {
+        switch self {
+        case .preparation:
+            return LessonFormatData(title: "Voorbereiding")
+
+        case .equipment:
+            return LessonFormatData(title: "Benodigdheden")
+
+        case .comprehension:
+            return LessonFormatData(title: "Uitleg")
+
+        case .practice:
+            return LessonFormatData(title: "Praktijk")
+
+        case .exercise:
+            return LessonFormatData(title: "Oefening")
+
+        case .demonstration:
+            return LessonFormatData(title: "Demonstratie")
+        }
+    }
+}
+
+public enum LessonConcept: String, Sendable, Codable, Hashable, CaseIterable {
+    // preparation
+    case training_process
+    case quality_and_quantity_repetitions
+    case duration_and_performance_peaks
+    case training_logbook
+
+    case hunger_drive
+
+    // management
+    case management
+    case forced_lure_or_pressured_turn_away
+    case above_threshold
+    case near_or_at_threshold
+    case below_threshold
+
+    // knowledge of behavior
+    case classical_conditioning
+    case operant_conditioning
+    case counter_conditioning
+    case premack_principle
+    case thresholds
+    case salience
+    case valence
+
+    // communication
+    case markers
+    case overshadowing
+
+    // motivation
+    case food_drive
+    case chase
+    case food_chase
+    case movement
+
+    case attention_retention
+    case post_reinforcement_pause
+    case reward_variability
+    case reinforcement_rate
+
+    case play_drive
+    case possession
+    case outing
+    case tugging
+
+    // engagement
+    case engagement
+    case low_distraction_environments
+    case controlled_static_distraction
+    case controlled_dynamic_distraction
+    case uncontrolled_static_distraction
+    case uncontrolled_dynamic_distraction
+
+    case around_distractions
+    case social_distraction
+
+    // shaping
+    case obedience
+    case assisted_shaping
+    case luring
+    case lure_fading
+    case free_shaping
+
+    case capping
+
+    // pressure 
+    case pressure_work
+    case leash_habituation
+    case opposition_reflex
+    case body_pressure
+    case spatial_pressure
+
+    // applied behavior modification
+    case habituation
+    case desensitization
+    case redirection
+
+    case arousal
+    case re_association // counter-conditioning
+    case turn_away
+
+    // applied behavior shaping
+    case recall
+    case restrained_recall
+}
+
+public extension ModuleComponent {
+    var displayTagline: String {
+        if let tagline, !tagline.isEmpty {
+            return tagline
+        }
+
+        let prefix: String? = {
+            if format.contains(.comprehension) { return "Begrip" }
+            if format.contains(.practice) { return "Praktijk" }
+            if format.contains(.exercise) { return "Oefening" }
+            if format.contains(.demonstration) { return "Demo" }
+            if format.contains(.preparation) { return "Voorbereiding" }
+            if format.contains(.equipment) { return "Benodigdheden" }
+            return nil
+        }()
+
+        let conceptList: [String] = concepts
+            .map { $0.title_nl }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+
+        let conceptsText = conceptList.joined(separator: " + ")
+
+        if let prefix {
+            if conceptsText.isEmpty { return prefix }
+            return "\(prefix): \(conceptsText)"
+        }
+
+        return conceptsText.isEmpty ? "onderdeel" : conceptsText
+    }
+}
+
+public extension LessonConcept {
+    var title_nl: String {
+        switch self {
+        // preparation
+        case .training_process: return "trainingsproces"
+        case .quality_and_quantity_repetitions: return "kwaliteit / kwantiteit van herhalingen"
+        case .duration_and_performance_peaks: return "trainings-duur en prestatie-pieken"
+        case .training_logbook: return "training logboek"
+        
+        case .hunger_drive: return "hongerdrijf"
+
+        // management
+        case .management: return "management (restrictie)"
+        case .forced_lure_or_pressured_turn_away: return "lokmiddel en/of draai forceren als (nood-)management"
+        case .above_threshold: return "boven drempelwaarde"
+        case .near_or_at_threshold: return "nabij of op drempelwaarde"
+        case .below_threshold: return "onder drempelwaarde"
+
+        // knowledge of behavior
+        case .classical_conditioning: return "klassieke conditionering"
+        case .operant_conditioning: return "operante conditionering"
+        case .counter_conditioning: return "counter-conditioning"
+        case .premack_principle: return "premack-principe"
+        case .thresholds: return "drempelwaardes"
+        case .salience: return "saillantie"
+        case .valence: return "valentie"
+
+        // communication
+        case .markers: return "markeersignalen"
+        case .overshadowing: return "overschaduwing"
+
+        // motivation
+        case .food_drive: return "voedseldrijf"
+        case .chase: return "jagen"
+        case .food_chase: return "voerjaagspel"
+        case .movement: return "beweging"
+
+        case .attention_retention: return "aandacht-behoud"
+        case .post_reinforcement_pause: return "post-beloning-pauze"
+        case .reward_variability: return "beloningsvariatie"
+        // case .reinforcement_rate: return "bekrachtigingsfrequentie"
+        case .reinforcement_rate: return "beloningsfrequentie"
+
+        case .play_drive: return "speeldrijf"
+        case .possession: return "bezit"
+        case .outing: return "loslaten"
+        case .tugging: return "trekspel"
+
+        // engagement
+        case .engagement: return "betrokkenheid"
+        case .low_distraction_environments: return "laag-prikkelende omgevingen"
+        case .controlled_static_distraction: return "statische afleiding (gecontroleerd)"
+        case .controlled_dynamic_distraction: return "dynamische afleiding (gecontroleerd)"
+        case .uncontrolled_static_distraction: return "statische afleiding (ongecontroleerd)"
+        case .uncontrolled_dynamic_distraction: return "dynamische afleiding (ongecontroleerd)"
+
+        case .around_distractions: return "rondom afleidingen"
+        case .social_distraction: return "sociale afleiding"
+
+        // shaping
+        case .obedience: return "gehoorzaamheid"
+        case .assisted_shaping: return "geassisteerd vormen"
+        case .luring: return "lokmiddel"
+        case .lure_fading: return "lokmiddel vervagen"
+        case .free_shaping: return "vrij vormen"
+        case .capping: return "capping"
+
+        // pressure
+        case .pressure_work: return "drukwerk"
+        case .leash_habituation: return "lijn-gewenning"
+        case .opposition_reflex: return "opposite-reflex"
+        case .body_pressure: return "lichaamsdruk"
+        case .spatial_pressure: return "ruimtelijke druk"
+
+        // applied behavior modification
+        case .habituation: return "habituatie"
+        case .desensitization: return "desensitisatie"
+        case .redirection: return "herleiden"
+        case .arousal: return "opwinding"
+        case .re_association: return "her-associatie"
+
+        // key behaviors
+        case .turn_away: return "afdraai en (weg)beweging"
+
+        // applied behavior shaping
+        case .recall: return "terugroepen"
+        case .restrained_recall: return "terugroepen onder bedwelming"
+        }
+    }
+}
+
+(!): 1 blank lines
+
+
++--------------------------------------------------+
+| Sources/_concept/data-structs/modules-type.swift |
++--------------------------------------------------+
+import Foundation
+
+// MODULES
+public struct Module: Sendable, Codable, Hashable, Identifiable {
+    public var id: UUID
+    public var title: String?
+    public var entries: [ModuleEntry]
+
+    public init(
+        id: UUID = UUID(),
+        title: String? = nil,
+        entries: [ModuleEntry]
+    ) {
+        self.id = id
+        self.title = title
+        self.entries = entries
+    }
+}
+
+public enum ModuleComponentPlacement: String, Sendable, Codable, Hashable {
+    case elementary
+    case exchangeable
+}
+
+public struct ModuleEntry: Sendable, Codable, Hashable, Identifiable {
+    public var id: UUID
+    public var component: ModuleComponent
+    public var placement: ModuleComponentPlacement
+    public var include: Bool
+
+    public init(
+        id: UUID = UUID(),
+        component: ModuleComponent,
+        placement: ModuleComponentPlacement,
+        include: Bool = true
+    ) {
+        self.id = id
+        self.component = component
+        self.placement = placement
+        self.include = include
+    }
+}
+
+// module component == lesson concepts x lesson format
+public struct ModuleComponent: Sendable, Codable, Hashable {
+    public var concepts: Set<LessonConcept>
+    public var format: Set<LessonFormat>
+    public var allocation: SessionAllocation?
+
+    public var details: String?  // internal notes
+
+    public var tagline: String?
+    public var caption: String?
+
+    public init(
+        concepts: Set<LessonConcept>,
+        format: Set<LessonFormat> = [],
+        allocation: SessionAllocation? = nil,
+        details: String? = nil,
+        tagline: String? = nil,
+        caption: String? = nil
+    ) {
+        self.concepts = concepts
+        self.format = format
+        self.allocation = allocation
+        self.details = details
+        self.tagline = tagline
+        self.caption = caption
+    }
+}
+
+extension ModuleComponent {
+    public static func empty() -> ModuleComponent {
+        .init(concepts: [], format: [])
+    }
+}
+
+(!): 1 blank lines
+
+
++---------------------------------------------------+
+| Sources/_concept/data-structs/packages-type.swift |
++---------------------------------------------------+
+import Foundation
+
+// PROGRAM
+public typealias Program = [Package]
+
+public enum BehaviorProblem: String, Sendable, CaseIterable {
+    case reactiviteit
+    case agressie
+    case verlatingsangst
+    case angst
+    case ongehoorzaamheid
+}
+
+public struct Package: Sendable, Codable, Hashable, Identifiable {
+    public var id: UUID
+    public var title: String
+    public var modules: [Module]
+    public var include: Bool
+
+    public init(
+        id: UUID = UUID(),
+        title: String,
+        modules: [Module],
+        include: Bool = true
+    ) {
+        self.id = id
+        self.title = title
+        self.modules = modules
+        self.include = include
+    }
+
+    public func package() -> Package {
+        return Package(
+            title: title,
+            modules: modules,
+            include: include
+        )
+    }
+}
+
+public enum PrebuiltPackage {
+    public static let startersvaardigheden: Package = .init(
+        title: "Startersvaardigheden",
+        modules: [
+            PrebuiltModules.communication(),
+            PrebuiltModules.motivation(),
+            PrebuiltModules.engagement()
+        ]
+    )
+
+    public static func hervorming(target: BehaviorProblem) -> Package {
+        return .init(
+            title: "Hervorming: " + target.rawValue,
+            modules: 
+                // self.startersvaardigheden.modules 
+                // + 
+                [PrebuiltModules.applied_behavior_modification(target: target)]
+        )
+    }
+}
+
+(!): 1 blank lines
+
+
++----------------------------------------------------------------+
+| Sources/_concept/data-structs/prebuilt-module-components.swift |
++----------------------------------------------------------------+
+import Foundation
+
+public enum PrebuiltModuleComponents {}
+
+public extension PrebuiltModuleComponents {
+    enum Preparation {
+        public static let training_process_design: ModuleComponent = .init(
+            concepts: [
+                .training_process,
+                .quality_and_quantity_repetitions,
+                .duration_and_performance_peaks
+            ],
+            format: [
+                .preparation,
+                .comprehension
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 5,
+                    high: 15
+                )
+            ),
+            tagline: "Trainingsproces: ontwerp en structuur",
+            caption: "Richtlijnen voor een successvol trainingsproces"
+        )
+
+        public static let training_logbook: ModuleComponent = .init(
+            concepts: [
+                .training_process,
+                .training_logbook
+            ],
+            format: [
+                .preparation,
+                .comprehension
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 5,
+                    high: 15
+                )
+            ),
+            tagline: "Trainingsproces: logboek, doelstellingen",
+            caption: "Definitie van success, progressie bijhouden"
+        )
+    }
+}
+
+
+public extension PrebuiltModuleComponents {
+    enum Equipment {
+        public static let equipment_leashing: ModuleComponent = .init(
+            concepts: [
+                .management
+            ],
+            format: [
+                .equipment
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 5,
+                    high: 15
+                )
+            ),
+            tagline: "Materiaal: lijnen (korthouder, korte lengte, lange lengtes, handvatten)",
+            caption: "Gebruik van verscheidene lijnsoorten"
+        )
+
+        public static let equipment_mounting: ModuleComponent = .init(
+            concepts: [
+                .management
+            ],
+            format: [
+                .equipment
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 5,
+                    high: 15
+                )
+            ),
+            tagline: "Materiaal: halsbanden (vlak / martingaal / slip) en tuigen",
+            caption: "Gebruik van verscheidene bevestigingen"
+        )
+
+        public static let equipment_pouch: ModuleComponent = .init(
+            concepts: [
+                .management
+            ],
+            format: [
+                .equipment
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 5,
+                    high: 10
+                )
+            ),
+            tagline: "Materiaal: (non-slingerende) voerbuidel",
+            caption: "Paraatheid van voer bij voedsel-gerelateerde oefeningen"
+        )
+
+        public static let equipment_toys: ModuleComponent = .init(
+            concepts: [
+                .engagement
+            ],
+            format: [
+                .equipment
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 5,
+                    high: 15
+                )
+            ),
+            tagline: "Materiaal: speelgoed voor speeldrijf",
+            caption: "Verschillende opties binnen speelgoed (hardheid, textuur)"
+        )
+    }
+}
+
+public extension PrebuiltModuleComponents {
+    enum Management {
+        public static let forced_turn_away: ModuleComponent = .init(
+            concepts: [
+                .forced_lure_or_pressured_turn_away,
+                .management,
+                .above_threshold,
+                .thresholds,
+                .turn_away,
+                .redirection
+            ],
+            format: [
+                .practice
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 5,
+                    high: 20
+                )
+            ),
+            tagline: "Nood-management: lokmiddel of (weg)draaien wanneer boven drempelwaarde",
+            caption: "Een 'uitweg' voor momenten waarop trainen niet meer kan: veilig afstand nemen, escalatie voorkomen, en daarna weer terug naar een trainbare situatie."
+        )
+    }
+}
+
+public extension PrebuiltModuleComponents {
+    enum Communication {
+        public static let markers_and_overshadowing: ModuleComponent = .init(
+            concepts: [
+                .markers,
+                .overshadowing
+            ],
+            format: [
+                .comprehension,
+                .demonstration
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 15,
+                    high: 60
+                )
+            ),
+            tagline: "Begrip markeersignalen en overschaduwing",
+            caption: "5 primaire communicatie-signalen voor effectieve communicatie (feedback)"
+        )
+
+        public static let classical_conditioning: ModuleComponent = .init(
+            concepts: [
+                .classical_conditioning
+            ],
+            format: [
+                .comprehension
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 15,
+                    high: 30
+                )
+            ),
+            tagline: "Klassieke conditionering (associatie-principe)",
+            caption: "Voorspellende [Prikkel] -> [Gevolg] relatie"
+        )
+
+        public static let overshadowing: ModuleComponent = .init(
+            concepts: [
+                .overshadowing
+            ],
+            format: [
+                .comprehension,
+                .demonstration
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 5,
+                    high: 30
+                )
+            ),
+            tagline: "Overschaduwing",
+            caption: "Inachtname van overstemmende prikkels (visueel > auditief)"
+        )
+
+        public static let thresholds_drive_priority: ModuleComponent = .init(
+            concepts: [
+                .thresholds
+            ],
+            format: [
+                .comprehension
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 5,
+                    high: 15
+                )
+            ),
+            tagline: "Begrip drempelwaardes: relatieve prioriteit van drijfveren",
+            caption: "Inachtname van drempelwaardes tot op waarneming, fixatie, en escalatie"
+        )
+    }
+}
+
+public extension PrebuiltModuleComponents {
+    enum Motivation {
+        public static let movement_variation_frequency: ModuleComponent = .init(
+            concepts: [
+                .engagement,
+                .movement,
+                .reward_variability,
+                .reinforcement_rate
+            ],
+            format: [
+                .comprehension
+            ],
+            allocation: .init(
+                sessions: .init(
+                    low: 1,
+                    high: 2
+                )
+            ),
+            tagline: "Begrip: beweging, variatie, frequentie (interesse-behoud)",
+            caption: "De kernprincipes van opbouw naar hoge motivatie / drijf"
+        )
+
+        public static let food_drive_chase_game: ModuleComponent = .init(
+            concepts: [
+                .engagement,
+                .movement,
+                .reward_variability,
+                .reinforcement_rate,
+                .food_chase,
+                .food_drive
+            ],
+            format: [
+                .practice,
+                .exercise
+            ],
+            allocation: .init(
+                sessions: .init(
+                    low: 1,
+                    high: 3
+                )
+            ),
+            tagline: "Oefening voedseldrijf: (voer)jaagspel",
+            caption: "Toepassing van motivatieprincipes, gelijktijdige belading (terminerend) beloningssignaal"
+        )
+
+        public static let play_drive_tug_development: ModuleComponent = .init(
+            concepts: [
+                .engagement,
+                .tugging,
+                .outing
+            ],
+            format: [
+                .practice,
+                .exercise
+            ],
+            allocation: .init(
+                sessions: .init(
+                    low: 1,
+                    high: 3
+                )
+            ),
+            tagline: "Speeldrijf: ontwikkeling van interactief trekspel",
+            caption: "Toepassing van motivatieprincipes, gelijktijdige belading (terminerend) beloningssignaal"
+        )
+
+        public static let demo_chase: ModuleComponent = .init(
+            concepts: [
+                .food_chase
+            ],
+            format: [
+                .demonstration
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 5,
+                    high: 15
+                )
+            ),
+            tagline: "Demo: (voer)jaagspel, markeersignalen, gedragssignalen",
+            caption: "Voorbeeld van eindresultaat bij (voer)jaagspel"
+        )
+
+        public static let demo_tug: ModuleComponent = .init(
+            concepts: [
+                .tugging
+            ],
+            format: [
+                .demonstration
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 5,
+                    high: 15
+                )
+            ),
+            tagline: "Demo: trekspel, markeersignalen, gedragssignalen",
+            caption: "Voorbeeld van eindresultaat bij trekspel"
+        )
+    }
+}
+
+public extension PrebuiltModuleComponents {
+    enum Neutralisation {
+        public static let desensitization_salience_valence: ModuleComponent = .init(
+            concepts: [
+                .desensitization,
+                .salience,
+                .valence,
+                .re_association,
+                .habituation
+            ],
+            format: [
+                .comprehension
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 10,
+                    high: 30
+                )
+            ),
+            tagline: "Begrip: desensitisatie / desensibilisatie",
+            caption: "Afname van saillantie (opmerkbaarheid), ombuiging van valentie (neutralizeer appetitieve of afstotende waarde)"
+        )
+
+        public static let exercise_controlled_dynamic_distraction: ModuleComponent = .init(
+            concepts: [
+                .controlled_dynamic_distraction,
+                .social_distraction,
+                .redirection,
+                .attention_retention
+            ],
+            format: [
+                .exercise,
+                .practice
+            ],
+            allocation: .init(
+                sessions: .init(
+                    low: 1,
+                    high: 3
+                )
+            ),
+            tagline: "Oefening: dynamische afleiding met tweede (vertrouwde) persoon",
+            caption: "Wegroepen van versterkend naar non-versterkende afleiding"
+        )
+
+        public static let exercise_controlled_static_distraction: ModuleComponent = .init(
+            concepts: [
+                .recall,
+                .controlled_static_distraction,
+                .attention_retention
+            ],
+            format: [
+                .exercise,
+                .practice
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 10,
+                    high: 30
+                )
+            ),
+            tagline: "Oefening: afroepen bij statische (vertrouwde) afleiding",
+            caption: "Bevordering van betrokkenheid rondom non-versterkende afleidingen"
+        )
+        
+        public static let around_uncontrolled_distractions: ModuleComponent = .init(
+            concepts: [
+                .movement,
+                .pressure_work,
+                .reinforcement_rate,
+                .reward_variability,
+                .around_distractions,
+                .arousal
+            ],
+            format: [
+                .comprehension,
+                .practice
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 10,
+                    high: 45
+                )
+            ),
+            tagline: "(Weg)beweging, druk en beloningsfrequentie rondom (vertrouwde) afleidingen",
+            caption: "Verhouding tegenover onbeheerste (mogelijk-versterkende) afleidingen, middels betrekking en mogelijk drukwerk"
+        )
+    }
+}
+
+public extension PrebuiltModuleComponents {
+    enum Pressure {
+        public static let leash_habituation_opposition_reflex: ModuleComponent = .init(
+            concepts: [
+                .pressure_work,
+                .leash_habituation,
+                .opposition_reflex
+            ],
+            format: [
+                .comprehension,
+                .practice
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 10,
+                    high: 45
+                )
+            ),
+            tagline: "Drukwerk: lijn-gewenning en opposite-reflex",
+            caption: "Inzetbaarheid van lijn als sturend middel (gebruik bij vorming, management)"
+        )
+
+        public static let body_spatial_pressure: ModuleComponent = .init(
+            concepts: [
+                .pressure_work,
+                .body_pressure,
+                .spatial_pressure
+            ],
+            format: [
+                .comprehension,
+                .practice
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 15,
+                    high: 60
+                )
+            ),
+            tagline: "Lichaams- en ruimtelijke druk: vorming en geleiding",
+            caption: "Begeleiding via lichaamstaal om ruimtegebruik en positie te sturen"
+        )
+    }
+}
+
+public extension PrebuiltModuleComponents {
+    enum Engagement {
+        public static let focus_retention_foundation: ModuleComponent = .init(
+            concepts: [
+                .engagement
+            ],
+            format: [
+                .practice
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 15,
+                    high: 60
+                )
+            ),
+            tagline: "Oefening: activatie bij aandacht (vrij van signalering gevormd)",
+            caption: "Fundering van focus-verkrijging, naast focus-behoud (motivatieprincipes)"
+        )
+
+        public static let context_signals_start_stop: ModuleComponent = .init(
+            concepts: [
+                .management
+            ],
+            format: [
+                .comprehension
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 5,
+                    high: 15
+                )
+            ),
+            tagline: "Gebruik van context-signalen (start, stop)",
+            caption: "Omvatting van focus-behoud periode op beheersbaar signaal"
+        )
+    }
+}
+
+public extension PrebuiltModuleComponents {
+    enum Shaping {
+        public static let assisted_shaping_obedience: ModuleComponent = .init(
+            concepts: [
+                .obedience,
+                .assisted_shaping
+            ],
+            format: [
+                .practice
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 15,
+                    high: 60
+                )
+            ),
+            tagline: "Gehoorzaamheid: geassisteerd vormen",
+            caption: "Gedragsvorming middels lokmiddel ('gemaakte' bewegingsvormen)"
+        )
+    }
+}
+
+public extension PrebuiltModuleComponents {
+    enum BehaviorModification {
+        public static let redirection_attention: ModuleComponent = .init(
+            concepts: [
+                .redirection,
+                .attention_retention,
+
+                // “statische afleiding in huis” but in the probleemsituatie:
+                .uncontrolled_static_distraction,
+
+                // applying under threshold constraints
+                .below_threshold,
+                .near_or_at_threshold,
+                .thresholds
+            ],
+            format: [
+                .practice,
+                .exercise
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 10,
+                    high: 45
+                )
+            ),
+            tagline: "Herleiding en aandachtshakeling bij statische (aansporende) prikkeling",
+            caption: "Betrokkenheid rondom afleidingen die (mogelijk-escalerende) reacties oproepen"
+        )
+
+        public static let redirection_on_rising_arousal: ModuleComponent = .init(
+            concepts: [
+                .redirection,
+                .arousal,
+                .thresholds,
+                .near_or_at_threshold,
+
+                .uncontrolled_dynamic_distraction
+            ],
+            format: [
+                .practice,
+                .exercise
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 10,
+                    high: 45
+                )
+            ),
+            tagline: "Herleiding bij dynamische / opbouwende (aansporende) prikkeling",
+            caption: "Herleiding met interval tijdens 'opbouw' om stijgende opwinding af te kunnen laten vloeien"
+        )
+
+        public static let redirection_with_potential_pressure: ModuleComponent = .init(
+            concepts: [
+                .redirection,
+                .pressure_work,
+                .social_distraction,
+
+                .near_or_at_threshold,
+                .below_threshold,
+                .thresholds
+            ],
+            format: [
+                .comprehension,
+                .practice
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 10,
+                    high: 45
+                )
+            ),
+            tagline: "Herleiding met mogelijke incorporatie druk en/of (sociale) correctie",
+            caption: "Herleiding met mogelijke ondersteuning van onderdrukking richting dysfunctionele reacties (nabij of op, niet over drempelwaarde)"
+        )
+
+        public static let exercise_dynamic_static_alternation: ModuleComponent = .init(
+            concepts: [
+                .redirection,
+                .attention_retention,
+
+                .uncontrolled_dynamic_distraction,
+                .uncontrolled_static_distraction,
+
+                .arousal,
+                .thresholds,
+                .near_or_at_threshold
+            ],
+            format: [
+                .exercise,
+                .practice
+            ],
+            allocation: .init(
+                sessions: .init(
+                    low: 1,
+                    high: 3
+                )
+            ),
+            tagline: "Oefening: dynamisch-statisch afwisseling in prikkelcontext",
+            caption: "Geleidelijk toewerken van actieve herleiding naar (passievere) statische posties en postie-behoud"
+        )
+
+        public static let premack_discharge_energy: ModuleComponent = .init(
+            concepts: [
+                .premack_principle
+            ],
+            format: [
+                .comprehension,
+                .practice,
+                .demonstration
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 5,
+                    high: 60
+                )
+            ),
+            tagline: "Premack: afvloeiing van energie en opwinding bij reuring (weg van opwellende prikkel)",
+            caption: "Gebruik van hoog-waarschijnlijk gedrag om lager-waarschijnlijk gedrag te versterken"
+        )
+
+        public static let capping_dynamic_to_static: ModuleComponent = .init(
+            concepts: [
+                .capping,
+                .premack_principle
+            ],
+            format: [
+                .comprehension,
+                .practice,
+                .demonstration
+            ],
+            allocation: .init(
+                minutes: .init(
+                    low: 5,
+                    high: 30
+                )
+            ),
+            tagline: "Capping: overgang dynamische beweging naar statische positie",
+            caption: "Verhoging van mate controle bij gehoorzaamheid"
+        )
+    }
+}
+
+(!): 1 blank lines
+
+
++------------------------------------------------------+
+| Sources/_concept/data-structs/prebuilt-modules.swift |
++------------------------------------------------------+
+import Foundation
+
+public enum PrebuiltModules {
+    public static func preparation() -> Module {
+        Module(
+            title: "Voorbereiding",
+            entries: [
+                .init(component: PrebuiltModuleComponents.Preparation.training_process_design, placement: .elementary),
+                .init(component: PrebuiltModuleComponents.Preparation.training_logbook, placement: .exchangeable),
+            ]
+        )
+    }
+
+    public static func equipment() -> Module {
+        Module(
+            title: "Materiaal",
+            entries: [
+                .init(component: PrebuiltModuleComponents.Equipment.equipment_leashing, placement: .elementary),
+                .init(component: PrebuiltModuleComponents.Equipment.equipment_mounting, placement: .elementary),
+
+                .init(component: PrebuiltModuleComponents.Equipment.equipment_pouch, placement: .exchangeable),
+                .init(component: PrebuiltModuleComponents.Equipment.equipment_toys, placement: .exchangeable),
+            ]
+        )
+    }
+
+    public static func management() -> Module {
+        Module(
+            title: "Management: opzet (her)vorming, voorkom ongewenst gedrag (en/of verergerging)",
+            entries: [
+                .init(component: PrebuiltModuleComponents.Management.forced_turn_away, placement: .elementary),
+            ]
+        )
+    }
+
+    public static func communication() -> Module {
+        Module(
+            title: "Voorspelbaarheid en communicatie",
+            entries: [
+                // Elementary (core)
+                .init(component: PrebuiltModuleComponents.Communication.markers_and_overshadowing, placement: .elementary),
+                .init(component: PrebuiltModuleComponents.Communication.thresholds_drive_priority, placement: .elementary),
+
+                // Exchangeable
+                .init(component: PrebuiltModuleComponents.Communication.classical_conditioning, placement: .exchangeable),
+                // .init(component: PrebuiltModuleComponents.Communication.overshadowing, placement: .exchangeable),
+            ]
+        )
+    }
+
+    public static func motivation() -> Module {
+        Module(
+            title: "Motivatie: ontwikkeling hoge aantrekkingskracht en aandacht-manipulatie",
+            entries: [
+                // Elementary (core)
+                .init(component: PrebuiltModuleComponents.Motivation.movement_variation_frequency, placement: .elementary),
+                .init(component: PrebuiltModuleComponents.Motivation.food_drive_chase_game, placement: .elementary),
+
+                // Exchangeable
+                .init(component: PrebuiltModuleComponents.Motivation.play_drive_tug_development, placement: .exchangeable),
+                .init(component: PrebuiltModuleComponents.Motivation.demo_chase, placement: .exchangeable),
+                .init(component: PrebuiltModuleComponents.Motivation.demo_tug, placement: .exchangeable),
+            ]
+        )
+    }
+
+    public static func engagement() -> Module {
+        Module(
+            title: "Engagement",
+            entries: [
+                // Elementary (core)
+                .init(component: PrebuiltModuleComponents.Engagement.focus_retention_foundation, placement: .elementary),
+
+                // Exchangeable
+                .init(component: PrebuiltModuleComponents.Engagement.context_signals_start_stop, placement: .exchangeable),
+            ]
+        )
+    }
+
+    public static func neutralisation() -> Module {
+        Module(
+            title: "Neutralisatie: (her)associatie omgevingsprikkeling (habituatie)",
+            entries: [
+                // Elementary (core) — mirrors fase2 bullets
+                .init(component: PrebuiltModuleComponents.Neutralisation.desensitization_salience_valence, placement: .elementary),
+                .init(component: PrebuiltModuleComponents.Neutralisation.exercise_controlled_dynamic_distraction, placement: .elementary),
+                .init(component: PrebuiltModuleComponents.Neutralisation.around_uncontrolled_distractions, placement: .elementary),
+
+                // Exchangeable (optional / swap-ins) — mirrors fase2 callout
+                .init(component: PrebuiltModuleComponents.Neutralisation.exercise_controlled_static_distraction, placement: .exchangeable),
+            ]
+        )
+    }
+
+    public static func pressure() -> Module {
+        Module(
+            title: "Drukwerk: vorming, sturing, management",
+            entries: [
+                .init(component: PrebuiltModuleComponents.Pressure.leash_habituation_opposition_reflex, placement: .exchangeable),
+                .init(component: PrebuiltModuleComponents.Pressure.body_spatial_pressure, placement: .exchangeable),
+            ]
+        )
+    }
+
+    public static func shaping() -> Module {
+        Module(
+            title: "Vorming gedragskaders (gehoorzaamheid, toegepaste gedragssignalen)",
+            entries: [
+                .init(component: PrebuiltModuleComponents.Shaping.assisted_shaping_obedience, placement: .elementary),
+            ]
+        )
+    }
+
+    public static func behavior_modification() -> Module {
+        Module(
+            title: "Herleiding en controle onder prikkelcontext",
+            entries: [
+                // Elementary (core) — mirrors fase3 bullets
+                .init(component: PrebuiltModuleComponents.BehaviorModification.redirection_attention, placement: .elementary),
+                .init(component: PrebuiltModuleComponents.BehaviorModification.redirection_on_rising_arousal, placement: .elementary),
+                .init(component: PrebuiltModuleComponents.BehaviorModification.redirection_with_potential_pressure, placement: .elementary),
+
+                // Exchangeable (optional / swap-ins) — mirrors fase3 callout
+                .init(component: PrebuiltModuleComponents.BehaviorModification.premack_discharge_energy, placement: .exchangeable),
+                .init(component: PrebuiltModuleComponents.BehaviorModification.capping_dynamic_to_static, placement: .exchangeable),
+                .init(component: PrebuiltModuleComponents.BehaviorModification.exercise_dynamic_static_alternation, placement: .exchangeable),
+            ]
+        )
+    }
+
+    public static func applied_behavior_modification(target: BehaviorProblem) -> Module {
+        let _ = target
+        return behavior_modification()
+    }
+}
+
+(!): 1 blank lines
+
+
++-------------------------------------------------------+
+| Sources/_concept/views-hierarchy/program-export.swift |
++-------------------------------------------------------+
+import Foundation
+import Interfaces
+
+public enum ProgramExport {
+    public struct Request: Sendable {
+        /// Output can be either:
+        /// - a directory path (recommended), OR
+        /// - a full file path (with or without ".pdf")
+        public var output: String
+
+        public var title: String
+        public var filename: String
+        public var margins: Double
+        public var debugHTML: Bool
+
+        public init(
+            output: String = "",
+            title: String = "Programma-overzicht",
+            filename: String = "programma-overzicht",
+            margins: Double = 35,
+            debugHTML: Bool = false
+        ) {
+            self.output = output
+            self.title = title
+            self.filename = filename
+            self.margins = margins
+            self.debugHTML = debugHTML
+        }
+    }
+
+    public static func export(program: [Package], request: Request = .init()) throws -> URL {
+        let includedProgram = program.filter { $0.include }
+
+        let overview = makeOverview(program: includedProgram)
+
+        let html = ProgramHTML.build(
+            program: includedProgram,
+            title: request.title,
+            overview: overview
+        ).render()
+
+        let dest = try resolveDestination(request: request)
+
+        try FileManager.default.createDirectory(
+            at: dest.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+
+        if request.debugHTML {
+            do {
+                let debugHTML = dest
+                    .deletingPathExtension()
+                    .appendingPathExtension("debug.html")
+                try html.write(to: debugHTML, atomically: true, encoding: .utf8)
+            } catch {
+                // ignore
+            }
+        }
+
+        let cssMargins = CSSMargins(request.margins)
+        let css = CSSPageSetting(margins: cssMargins)
+
+        do {
+            try html.weasyPDF(css: css, destination: dest.path)
+        } catch {
+            logPDFExportFailure(
+                error: error,
+                destination: dest,
+                request: request,
+                htmlBytes: html.utf8.count
+            )
+            throw error
+        }
+
+        return dest
+    }
+
+    private static func makeOverview(program: [Package]) -> DocDataBox {
+        // Placeholders for now (you said hardcode)
+        let clientName = "—"
+        let dogName = "—"
+
+        let dateLabel: String = {
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "nl_NL")
+            f.dateFormat = "d MMMM yyyy"
+            return f.string(from: Date())
+        }()
+
+        let sessions = ProgramTally.sessions(program: program, sessionDuration: 60)
+        let estimatedSessions: (low: Int, high: Int)? = {
+            let r = sessions.rounded
+            if r.low == 0 && r.high == 0 { return nil }
+            return (low: r.low, high: r.high)
+        }()
+
+        let includedPackages = program.map(\.title)
+
+        return DocDataBox(
+            dateLabel: dateLabel,
+            clientName: clientName,
+            dogName: dogName,
+            estimatedSessions: estimatedSessions,
+            includedPackages: includedPackages
+        )
+    }
+
+    // public static func export(program: [Package], request: Request = .init()) throws -> URL {
+    //     let html = ProgramHTML.build(
+    //         // program: program,
+    //         program: program.filter { $0.include },
+    //         title: request.title
+    //     ).render()
+
+    //     let dest = try resolveDestination(request: request)
+
+    //     try FileManager.default.createDirectory(
+    //         at: dest.deletingLastPathComponent(),
+    //         withIntermediateDirectories: true
+    //     )
+
+    //     if request.debugHTML {
+    //         do {
+    //             let debugHTML = dest
+    //                 .deletingPathExtension()
+    //                 .appendingPathExtension("debug.html")
+    //             try html.write(to: debugHTML, atomically: true, encoding: .utf8)
+    //         } catch {
+    //             // ignore
+    //         }
+    //     }
+
+    //     let cssMargins = CSSMargins(request.margins)
+    //     let css = CSSPageSetting(margins: cssMargins)
+
+    //     do {
+    //         try html.weasyPDF(css: css, destination: dest.path)
+    //     } catch {
+    //         logPDFExportFailure(
+    //             error: error,
+    //             destination: dest,
+    //             request: request,
+    //             htmlBytes: html.utf8.count
+    //         )
+    //         throw error
+    //     }
+
+    //     return dest
+    // }
+
+    // MARK: - Destination resolution
+
+    private static func resolveDestination(request: Request) throws -> URL {
+        let output = normalizePath(request.output)
+
+        // Default to ~/Desktop when output is empty OR resolves to "/" (e.g. currentDirectoryPath in apps)
+        if output.isEmpty || output == "/" {
+            return try defaultDestinationOnDesktop(request: request)
+        }
+
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: output, isDirectory: &isDir) {
+            if isDir.boolValue {
+                return URL(fileURLWithPath: output, isDirectory: true)
+                    .appendingPathComponent("\(request.filename).pdf")
+                    .standardizedFileURL
+            } else {
+                return forcePDFExtension(URL(fileURLWithPath: output, isDirectory: false))
+                    .standardizedFileURL
+            }
+        }
+
+        let endsWithSlash = output.hasSuffix("/") || output.hasSuffix("\\")
+        let outURL = URL(fileURLWithPath: output, isDirectory: endsWithSlash)
+
+        if endsWithSlash {
+            return outURL
+                .appendingPathComponent("\(request.filename).pdf")
+                .standardizedFileURL
+        }
+
+        let last = outURL.lastPathComponent
+        if last.contains(".") {
+            return forcePDFExtension(outURL).standardizedFileURL
+        } else {
+            return URL(fileURLWithPath: output, isDirectory: true)
+                .appendingPathComponent("\(request.filename).pdf")
+                .standardizedFileURL
+        }
+    }
+
+    /// HOME/Desktop
+    private static func defaultDestinationOnDesktop(request: Request) throws -> URL {
+        let desktop = try FileManager.default.url(
+            for: .desktopDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+
+        return desktop
+            .appendingPathComponent("\(request.filename).pdf")
+            .standardizedFileURL
+    }
+
+    private static func forcePDFExtension(_ url: URL) -> URL {
+        if url.pathExtension.lowercased() == "pdf" {
+            return url
+        }
+
+        if url.pathExtension.isEmpty {
+            return url.appendingPathExtension("pdf")
+        } else {
+            return url.deletingPathExtension().appendingPathExtension("pdf")
+        }
+    }
+
+    private static func normalizePath(_ path: String) -> String {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        if trimmed.hasPrefix("~") {
+            return (trimmed as NSString).expandingTildeInPath
+        }
+
+        return trimmed
+    }
+
+    // MARK: - Logging
+
+    private static func logPDFExportFailure(
+        error: Error,
+        destination: URL,
+        request: Request,
+        htmlBytes: Int
+    ) {
+        let ns = error as NSError
+
+        let destPath = destination.path
+        let destDir = destination.deletingLastPathComponent().path
+
+        var dirIsDir: ObjCBool = false
+        let dirExists = FileManager.default.fileExists(atPath: destDir, isDirectory: &dirIsDir)
+        let destExists = FileManager.default.fileExists(atPath: destPath)
+
+        let dirWritable = FileManager.default.isWritableFile(atPath: destDir)
+        let destWritableIfExists = FileManager.default.isWritableFile(atPath: destPath)
+
+        let lines: [String] = [
+            "",
+            "=== ProgramExport PDF failed ===",
+            "destination: \(destPath)",
+            "destination_dir: \(destDir)",
+            "dir_exists: \(dirExists) (isDir: \(dirIsDir.boolValue))",
+            "dest_exists: \(destExists)",
+            "dir_writable: \(dirWritable)",
+            "dest_writable_if_exists: \(destWritableIfExists)",
+            "request.output: \(request.output)",
+            "normalized_output: \(normalizePath(request.output))",
+            "request.filename: \(request.filename)",
+            "margins: \(request.margins)",
+            "debugHTML: \(request.debugHTML)",
+            "html_bytes: \(htmlBytes)",
+            "error_type: \(String(reflecting: type(of: error)))",
+            "localizedDescription: \(error.localizedDescription)",
+            "NSError.domain: \(ns.domain)",
+            "NSError.code: \(ns.code)",
+            ns.userInfo.isEmpty ? "NSError.userInfo: <empty>" : "NSError.userInfo: \(ns.userInfo)",
+            "=== /ProgramExport ===",
+            ""
+        ]
+
+        fputs(lines.joined(separator: "\n"), stderr)
+    }
+}
+
+(!): 1 blank lines
+
+
++-----------------------------------------------------+
+| Sources/_concept/views-hierarchy/program-html.swift |
++-----------------------------------------------------+
+import Foundation
+import HTML
+import CSS
+import Constructors
+
+public struct DocDataBox: Sendable {
+    public var dateLabel: String
+    public var clientName: String
+    public var dogName: String
+    public var estimatedSessions: (low: Int, high: Int)?
+    public var includedPackages: [String]?
+
+    public init(
+        dateLabel: String,
+        clientName: String,
+        dogName: String,
+        estimatedSessions: (low: Int, high: Int)? = nil,
+        includedPackages: [String]? = nil
+    ) {
+        self.dateLabel = dateLabel
+        self.clientName = clientName
+        self.dogName = dogName
+        self.estimatedSessions = estimatedSessions
+        self.includedPackages = includedPackages
+    }
+
+    public func html() -> HTMLFragment {
+        var contentNodes: [any HTMLNode] = [
+            docDataLine(label: "Datum:", value: dateLabel),
+            docDataLine(label: "Client:", value: clientName),
+            docDataLine(label: "Hond:", value: dogName),
+        ]
+
+        if let sessions = estimatedSessions {
+            contentNodes.append(
+                docDataLine(
+                    label: "Sessies:",
+                    value: "\(sessions.low)–\(sessions.high)"
+                )
+            )
+        }
+
+        if let packages = includedPackages, !packages.isEmpty {
+            let titleLabel = "Pakketsamenstelling:"
+
+            contentNodes.append(
+                docDataPackageLine(label: titleLabel, value: packages.first!)
+            )
+
+            for pkg in packages.dropFirst() {
+                contentNodes.append(
+                    docDataPackageLine(label: "", value: pkg)
+                )
+            }
+        }
+
+        return [
+            HTML.div(["class": "ph-docdata-box"]) {
+                contentNodes
+            }
+        ]
+    }
+
+    private func docDataLine(label: String, value: String) -> any HTMLNode {
+        HTML.div(["class": "ph-docdata-line"]) {
+            HTML.span(["class": "ph-docdata-label"]) { HTML.text(label) }
+            HTML.span(["class": "ph-docdata-value"]) { HTML.text(value) }
+        }
+    }
+
+    private func docDataPackageLine(label: String, value: String) -> any HTMLNode {
+        HTML.div(["class": "ph-docdata-line ph-docdata-package-line"]) {
+            HTML.span(["class": "ph-docdata-label"]) { HTML.text(label) }
+            HTML.span(["class": "ph-docdata-value"]) { HTML.text(value) }
+        }
+    }
+}
+
+public enum ProgramHTML {
+    public static func build(
+        program: [Package],
+        title: String = "Programma",
+        overview: DocDataBox? = nil
+    ) -> HTMLDocument {
+        HTML.document {
+            HTML.html(["lang": "nl"]) {
+                HTML.head {
+                    HTML.meta(.charset())
+                    HTML.meta(.viewport())
+                    HTML.title(title)
+
+                    HTML.style {
+                        ProgramHTMLStyles.blocks()
+                    }
+                }
+
+                HTML.body {
+                    HTML.div(["class": "ph-sheet"]) {
+                        renderHeader(title: title)
+
+                        if let overview {
+                            HTML.section(["class": "ph-overview"]) {
+                                overview.html()
+                            }
+                        }
+
+                        for pkg in program {
+                            renderPackage(pkg)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Header
+
+    private static func renderHeader(title: String) -> any HTMLNode {
+        HTML.div(["class": "ph-doc-header"]) {
+            HTML.div(["class": "ph-header-top"]) {
+                HTML.div(["class": "ph-brand"]) {
+                    HTML.div(["class": "ph-brand-name"]) { HTML.text("HONDENMEESTERS") }
+                }
+
+                HTML.div(["class": "ph-company-info"]) {
+                    HTML.p {
+                        HTML.text("Hondenmeesters V.O.F.")
+                    }
+                }
+            }
+
+            HTML.hr(["class": "ph-header-divider"])
+
+            HTML.div(["class": "ph-header-bottom"]) {
+                HTML.div(["class": "ph-header-left"]) {
+                    HTML.div(["class": "ph-subtitle-main"]) {
+                        HTML.text("Programma-overzicht")
+                    }
+                }
+
+                HTML.div(["class": "ph-header-right"]) {
+                    HTML.div(["class": "ph-doc-title-inline"]) {
+                        HTML.text(title)
+                    }
+                }
+            }
+        }
+    }
+
+    private static func renderPackage(_ pkg: Package) -> HTMLFragment {
+        return [
+            HTML.section(["class": "ph-package"]) {
+                HTML.div(["class": "ph-package-title"]) {
+                    HTML.text(pkg.title)
+                }
+
+                HTML.div(["class": "ph-package-body"]) {
+                    for m in pkg.modules {
+                        renderModule(m)
+                    }
+                }
+            }
+        ]
+    }
+
+    // private static func renderPackage(_ pkg: Package) -> HTMLFragment {
+    //     var nodes: HTMLFragment = []
+
+    //     nodes.append(
+    //         HTML.div(["class": "ph-package-title"]) {
+    //             HTML.text(pkg.title)
+    //         }
+    //     )
+
+    //     for m in pkg.modules {
+    //         nodes.append(contentsOf: renderModule(m))
+    //     }
+
+    //     return nodes
+    // }
+
+    private static func renderModule(_ module: Module) -> HTMLFragment {
+        let header: String = module.title ?? "Module"
+
+        return [
+            HTML.div(["class": "ph-box ph-box--module"]) {
+                HTML.div(["class": "ph-box__head"]) {
+                    HTML.div(["class": "ph-box__head-text"]) {
+                        HTML.div(["class": "ph-box__title"]) { HTML.text(header) }
+                    }
+                }
+
+                HTML.div(["class": "ph-box__body"]) {
+                    renderEntries(module.entries)
+                }
+            }
+        ]
+    }
+
+    private static func renderEntries(_ entries: [ModuleEntry]) -> HTMLFragment {
+        let visible = entries.filter { $0.include }
+
+        let elementary = visible.filter { $0.placement == .elementary }
+        let exchangeable = visible.filter { $0.placement == .exchangeable }
+
+        var nodes: HTMLFragment = []
+
+        nodes.append(
+            HTML.div(["class": "ph-component-list"]) {
+                for e in elementary {
+                    renderEntry(e, kind: .included)
+                }
+            }
+        )
+
+        if !exchangeable.isEmpty {
+            nodes.append(
+                HTML.div(["class": "ph-exchangeable-box"]) {
+                    HTML.div(["class": "ph-exchangeable-title"]) {
+                        HTML.text("Mogelijke aanvullingen of inwisselingen")
+                    }
+
+                    HTML.div(["class": "ph-component-list ph-component-list--exchangeable"]) {
+                        for e in exchangeable {
+                            renderEntry(e, kind: .exchangeable)
+                        }
+                    }
+                }
+            )
+        }
+
+        return nodes
+    }
+
+    private enum EntryKind {
+        case included
+        case exchangeable
+    }
+
+    private static func renderEntry(
+        _ entry: ModuleEntry,
+        kind: EntryKind
+    ) -> any HTMLNode {
+        let c = entry.component
+
+        // var chips: [String] = c.format
+        //     .map { $0.data.title }
+        //     .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+
+        // let (maybeLabel, titleText): (String?, String) =
+        //     splitTaglineIfCustom(tagline: c.tagline, fallback: c.displayTagline)
+
+        // if let label = maybeLabel, !label.isEmpty {
+        //     chips.insert(label, at: 0)
+        // }
+
+        let titleText: String = {
+            if let t = c.tagline, !t.isEmpty {
+                return t
+            }
+            return c.displayTagline
+        }()
+
+        let chips: [String] = c.format
+            .map { $0.data.title }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+
+
+        let rowClass = (kind == .exchangeable)
+            ? "ph-component-row ph-component-row--exchangeable"
+            : "ph-component-row"
+
+        return HTML.div(["class": rowClass]) {
+            HTML.div(["class": "ph-component-main"]) {
+                if !chips.isEmpty {
+                    HTML.div(["class": "ph-component-chips"]) {
+                        for t in chips {
+                            HTML.span(["class": "ph-chip"]) { HTML.text(t) }
+                        }
+                    }
+                }
+
+                HTML.div(["class": "ph-component-title"]) {
+                    HTML.text(titleText)
+                }
+            }
+
+            if let caption = c.caption, !caption.isEmpty {
+                HTML.div(["class": "ph-component-subtitle"]) {
+                    HTML.text(caption)
+                }
+            }
+        }
+    }
+
+    // MARK: - Tagline splitting rule
+
+    private static func splitTaglineIfCustom(tagline: String?, fallback: String) -> (label: String?, title: String) {
+        guard let tagline, !tagline.isEmpty else {
+            return (nil, fallback)
+        }
+
+        guard let i = tagline.firstIndex(of: ":") else {
+            return (nil, tagline)
+        }
+
+        let left = tagline[..<i].trimmingCharacters(in: .whitespacesAndNewlines)
+        let right = tagline[tagline.index(after: i)...].trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if left.isEmpty {
+            return (nil, right.isEmpty ? fallback : right)
+        }
+
+        if right.isEmpty {
+            return (String(left), String(left))
+        }
+
+        return (String(left), String(right))
+    }
+}
+
+public enum ProgramHTMLStyles {
+    @CSSBuilder
+    public static func blocks() -> [CSSBlock] {
+        CSS.rule("*", CSS.decl("box-sizing", "border-box"))
+
+        CSS.rule(
+            "body",
+            CSS.decl("margin", "0"),
+            CSS.decl("color", "#16181d"),
+            CSS.decl("font-family", "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif"),
+            CSS.decl("font-size", "13px"),
+            CSS.decl("line-height", "1.35")
+        )
+
+        CSS.rule(
+            ".ph-sheet",
+            CSS.decl("max-width", "900px"),
+            CSS.decl("margin", "24px auto"),
+            CSS.decl("padding", "22px")
+        )
+
+        // Header
+        CSS.rule(".ph-doc-header", CSS.decl("margin-bottom", "16px"))
+
+        CSS.rule(
+            ".ph-header-top",
+            CSS.decl("display", "flex"),
+            CSS.decl("justify-content", "space-between"),
+            CSS.decl("align-items", "flex-start")
+        )
+
+        CSS.rule(
+            ".ph-brand-name",
+            CSS.decl("font-size", "14px"),
+            CSS.decl("font-weight", "700"),
+            CSS.decl("letter-spacing", "1.2px")
+        )
+
+        CSS.rule(
+            ".ph-company-info",
+            CSS.decl("font-size", "12px"),
+            CSS.decl("font-weight", "200"),
+            CSS.decl("color", "gray"),
+            CSS.decl("text-align", "right"),
+            CSS.decl("line-height", "1.5"),
+            CSS.decl("margin", "0")
+        )
+
+        CSS.rule(".ph-company-info p", CSS.decl("margin", "0"))
+
+        CSS.rule(
+            ".ph-header-divider",
+            CSS.decl("border", "0"),
+            CSS.decl("border-top", "0.5px solid black"),
+            CSS.decl("margin", "10px 0 12px")
+        )
+
+        CSS.rule(
+            ".ph-header-bottom",
+            CSS.decl("display", "flex"),
+            CSS.decl("justify-content", "space-between"),
+            CSS.decl("align-items", "flex-start"),
+            CSS.decl("gap", "24px")
+        )
+
+        CSS.rule(
+            ".ph-subtitle-main",
+            CSS.decl("letter-spacing", "1.0px"),
+            CSS.decl("font-size", "13px"),
+            CSS.decl("font-weight", "300"),
+            CSS.decl("white-space", "nowrap")
+        )
+
+        CSS.rule(
+            ".ph-doc-title-inline",
+            CSS.decl("font-size", "13px"),
+            CSS.decl("font-weight", "400"),
+            CSS.decl("opacity", "0.9"),
+            CSS.decl("text-align", "right")
+        )
+
+        // Overview doc data (restored)
+        CSS.rule(
+            ".ph-overview",
+            CSS.decl("padding", "12px 14px"),
+            CSS.decl("background", "#ffffff"),
+            CSS.decl("border", "1px solid #ececf2"),
+            CSS.decl("border-radius", "12px"),
+            CSS.decl("margin", "0 0 14px")
+        )
+
+        CSS.rule(
+            ".ph-docdata-box",
+            CSS.decl("border", "1px solid #ececf2"),
+            CSS.decl("border-radius", "10px"),
+            CSS.decl("background", "#fbfbfd"),
+            CSS.decl("padding", "10px 12px"),
+            CSS.decl("font-size", "12px"),
+            CSS.decl("width", "100%"),
+            CSS.decl("margin", "0"),
+            CSS.decl("white-space", "normal")
+        )
+
+        CSS.rule(
+            ".ph-docdata-line",
+            CSS.decl("display", "flex"),
+            CSS.decl("justify-content", "space-between"),
+            CSS.decl("align-items", "center"),
+            CSS.decl("margin", "4px 0")
+        )
+
+        CSS.rule(
+            ".ph-docdata-package-line .ph-docdata-label",
+            CSS.decl("min-width", "140px"),
+            CSS.decl("flex-shrink", "0"),
+            CSS.decl("white-space", "nowrap")
+        )
+
+        CSS.rule(
+            ".ph-docdata-package-line .ph-docdata-value",
+            CSS.decl("white-space", "nowrap"),
+            CSS.decl("overflow", "hidden"),
+            CSS.decl("text-overflow", "ellipsis")
+        )
+
+        CSS.rule(
+            ".ph-docdata-label",
+            CSS.decl("font-weight", "500"),
+            CSS.decl("flex-shrink", "0")
+        )
+
+        CSS.rule(
+            ".ph-docdata-value",
+            CSS.decl("font-weight", "300"),
+            CSS.decl("word-break", "break-word")
+        )
+
+        // Package title
+        CSS.rule(
+            ".ph-package-title",
+            CSS.decl("margin", "14px 0 8px"),
+            CSS.decl("font-size", "12px"),
+            CSS.decl("font-weight", "600"),
+            CSS.decl("color", "#374151"),
+            CSS.decl("letter-spacing", "0.2px")
+        )
+
+        // Box
+        CSS.rule(
+            ".ph-box",
+            CSS.decl("border", "1px solid #ececf2"),
+            CSS.decl("border-radius", "12px"),
+            CSS.decl("background", "#ffffff"),
+            CSS.decl("overflow", "hidden"),
+            CSS.decl("margin", "0 0 14px")
+        )
+
+        CSS.rule(
+            ".ph-box__head",
+            CSS.decl("padding", "12px 14px"),
+            CSS.decl("border-bottom", "1px solid #ececf2")
+        )
+
+        CSS.rule(
+            ".ph-box__title",
+            CSS.decl("font-weight", "700"),
+            CSS.decl("font-size", "14px"),
+            CSS.decl("margin", "0")
+        )
+
+        CSS.rule(".ph-box__body", CSS.decl("padding", "12px 14px"))
+
+        // Component list
+        CSS.rule(
+            ".ph-component-list",
+            CSS.decl("display", "flex"),
+            CSS.decl("flex-direction", "column")
+        )
+
+        CSS.rule(
+            ".ph-component-row",
+            CSS.decl("padding", "8px 0"),
+            CSS.decl("border-top", "1px solid #ececf2")
+        )
+
+        CSS.rule(
+            ".ph-component-row:first-child",
+            CSS.decl("border-top", "0"),
+            CSS.decl("padding-top", "0")
+        )
+
+        // -----------------------------
+        // FIX 1: chips/title “gap” due to variable-length chip group
+        // - Make main line wrap
+        // - Make chips wrapper layout-neutral so chips + title share same flex line flow
+        // -----------------------------
+        // CSS.rule(
+        //     ".ph-component-main",
+        //     CSS.decl("display", "flex"),
+        //     CSS.decl("flex-wrap", "wrap"),
+        //     CSS.decl("align-items", "baseline"),
+        //     CSS.decl("column-gap", "8px"),
+        //     CSS.decl("row-gap", "6px"),
+        //     CSS.decl("min-width", "0")
+        // )
+
+        CSS.rule(
+            ".ph-component-main",
+            CSS.decl("display", "flex"),
+            CSS.decl("flex-direction", "column"),
+            CSS.decl("gap", "6px")
+        )
+
+        // CSS.rule(
+        //     ".ph-component-chips",
+        //     CSS.decl("display", "contents")
+        // )
+
+        // CSS.rule(
+        //     ".ph-component-chips",
+        //     CSS.decl("display", "flex"),
+        //     CSS.decl("flex-wrap", "wrap"),
+        //     CSS.decl("gap", "6px")
+        // )
+
+        // CSS.rule(
+        //     ".ph-chip",
+        //     CSS.decl("display", "inline-block"),
+        //     CSS.decl("padding", "2px 7px"),
+        //     CSS.decl("border", "1px solid #ececf2"),
+        //     CSS.decl("border-radius", "999px"),
+        //     CSS.decl("background", "#fbfbfd"),
+        //     CSS.decl("font-size", "11px"),
+        //     CSS.decl("line-height", "1.2"),
+        //     CSS.decl("color", "#374151"),
+        //     CSS.decl("white-space", "nowrap")
+        // )
+
+        CSS.rule(
+            ".ph-component-chips",
+            CSS.decl("display", "flex"),
+            CSS.decl("flex-wrap", "wrap"),
+            CSS.decl("gap", "6px"),
+            CSS.decl("align-items", "center")
+        )
+
+        CSS.rule(
+            ".ph-chip",
+            CSS.decl("display", "inline-flex"),
+            CSS.decl("align-items", "center"),
+            CSS.decl("justify-content", "center"),
+            CSS.decl("flex", "0 0 auto"),
+
+            CSS.decl("padding", "2px 7px"),
+            CSS.decl("border-radius", "999px"),
+
+            // ONE stroke, no double-render seams
+            CSS.decl("border", "0"),
+            CSS.decl("background", "#fbfbfd"),
+            CSS.decl("box-shadow", "inset 0 0 0 1px #ececf2"),
+
+            CSS.decl("outline", "0"),
+            CSS.decl("filter", "none"),
+
+            CSS.decl("font-size", "11px"),
+            CSS.decl("line-height", "1.1"),
+            CSS.decl("color", "#374151"),
+            CSS.decl("white-space", "nowrap")
+        )
+
+        // CSS.rule(
+        //     ".ph-component-title",
+        //     CSS.decl("font-size", "13px"),
+        //     CSS.decl("font-weight", "400"),
+        //     CSS.decl("color", "#16181d"),
+        //     CSS.decl("min-width", "0"),
+        //     CSS.decl("flex", "1 1 260px")
+        // )
+
+        CSS.rule(
+            ".ph-component-title",
+            CSS.decl("font-size", "13px"),
+            CSS.decl("font-weight", "400"),
+            CSS.decl("color", "#16181d")
+        )
+
+        // Caption: more prominent
+        CSS.rule(
+            ".ph-component-subtitle",
+            CSS.decl("margin-top", "4px"),
+            CSS.decl("font-size", "12.5px"),
+            CSS.decl("font-weight", "400"),
+            CSS.decl("color", "#374151")
+        )
+
+        // -----------------------------
+        // FIX 2: exchangeable area should read like original “inner callout box”
+        // -----------------------------
+        CSS.rule(
+            ".ph-exchangeable-box",
+            CSS.decl("margin-top", "12px"),
+            CSS.decl("padding", "10px 12px"),
+            CSS.decl("border", "1px solid #ececf2"),
+            CSS.decl("border-radius", "10px"),
+            CSS.decl("background", "#ffffff")
+        )
+
+        CSS.rule(
+            ".ph-exchangeable-title",
+            CSS.decl("margin", "0 0 6px"),
+            CSS.decl("font-weight", "700"),
+            CSS.decl("font-size", "12px"),
+            CSS.decl("color", "#374151")
+        )
+
+        CSS.rule(
+            ".ph-component-list--exchangeable .ph-component-row",
+            CSS.decl("border-top", "1px solid #ececf2"),
+            CSS.decl("padding", "7px 0")
+        )
+
+        CSS.rule(
+            ".ph-component-list--exchangeable .ph-component-row:first-child",
+            CSS.decl("border-top", "0"),
+            CSS.decl("padding-top", "0")
+        )
+
+        CSS.rule(
+            ".ph-component-row--exchangeable",
+            CSS.decl("border-top", "1px solid #ececf2")
+        )
+
+        CSS.media(
+            "print",
+            CSS.rule(".ph-sheet", CSS.decl("margin", "0")),
+            CSS.rule(".ph-sheet", CSS.decl("padding", "0"))
+        )
+
+        // ---------------------------------------------
+        // PACKAGE WRAPPER (spacing + stronger title + multi-page safe rail)
+        // ---------------------------------------------
+
+        CSS.rule(
+            ".ph-package",
+            CSS.decl("margin", "28px 0 22px") // more top breathing room between packages
+        )
+
+        CSS.rule(
+            ".ph-package:first-of-type",
+            CSS.decl("margin-top", "18px") // don't over-push the very first package
+        )
+
+        // Make the title read like a section header, not a random label.
+        CSS.rule(
+            ".ph-package-title",
+            CSS.decl("margin", "0 0 10px"),
+            CSS.decl("font-size", "13px"),
+            CSS.decl("font-weight", "750"),
+            CSS.decl("letter-spacing", "0.6px"),
+            CSS.decl("text-transform", "uppercase"),
+            CSS.decl("color", "#111827")
+        )
+
+        // Optional: a subtle divider under the title to separate it from the first module box
+        CSS.rule(
+            ".ph-package-title",
+            CSS.decl("padding-bottom", "8px"),
+            CSS.decl("border-bottom", "1px solid #ececf2")
+        )
+
+        // Multi-page safe “rail” for the package contents
+        CSS.rule(
+            ".ph-package-body",
+            CSS.decl("margin-top", "10px"),
+            CSS.decl("border-left", "3px solid #ececf2"),
+            CSS.decl("padding-left", "14px"),
+            CSS.decl("-webkit-box-decoration-break", "clone"),
+            CSS.decl("box-decoration-break", "clone")
+        )
+
+        // Ensure modules stack and keep your existing spacing rules
+        CSS.rule(
+            ".ph-package-body .ph-box",
+            CSS.decl("margin", "0 0 14px")
+        )
+
+        CSS.rule(
+            ".ph-package-body .ph-box:last-child",
+            CSS.decl("margin-bottom", "0")
+        )
+    }
+}
+
+(!): 1 blank lines
+
+
++------------------------------------------------------+
+| Sources/_concept/views-hierarchy/program-tally.swift |
++------------------------------------------------------+
+import Foundation
+
+public enum ProgramTally {
+    public enum EstimateBand: Sendable, Hashable {
+        case low_high
+        case low_medium
+        case medium_high
+    }
+
+    /// Returns a rounded tally in the requested band.
+    /// - Important: we round only at the end (after summing precise sessions).
+    public static func sessions(
+        program: Program,
+        sessionDuration: Int = 60,
+        band: EstimateBand = .low_high
+    ) -> SessionRange {
+        var low: Double = 0
+        var medium: Double = 0
+        var high: Double = 0
+
+        for pkg in program {
+            for module in pkg.modules {
+                for entry in module.entries where entry.include {
+                    guard let alloc = entry.component.allocation else { continue }
+
+                    let r = alloc.minutes.session_range(session_duration: sessionDuration)
+
+                    low += r.low
+                    medium += r.effectiveMedium()
+                    high += r.high
+                }
+            }
+        }
+
+        let a: Double
+        let b: Double
+
+        switch band {
+        case .low_high:
+            a = low
+            b = high
+        case .low_medium:
+            a = low
+            b = medium
+        case .medium_high:
+            a = medium
+            b = high
+        }
+
+        let roundedA = Int(a.rounded(.toNearestOrAwayFromZero))
+        let roundedB = Int(b.rounded(.toNearestOrAwayFromZero))
+
+        return .init(
+            low: Double(roundedA),
+            high: Double(roundedB)
+        )
+    }
+
+    public static func minutes(program: Program) -> MinuteRange {
+        var low: Int = 0
+        var high: Int = 0
+
+        for pkg in program {
+            for module in pkg.modules {
+                for entry in module.entries where entry.include {
+                    guard let alloc = entry.component.allocation else { continue }
+                    low += alloc.minutes.low
+                    high += alloc.minutes.high
+                }
+            }
+        }
+
+        return .init(low: low, high: high)
+    }
+}
+
+(!): 1 blank lines
+
+
++----------------------------------------------------------+
+| Sources/_concept/views-hierarchy/program-viewmodel.swift |
++----------------------------------------------------------+
+import SwiftUI
+
+@MainActor
+public final class ProgramEditorViewModel: ObservableObject {
+    @Published public var program: Program
+    @Published public var selectedPackageID: Package.ID?
+
+    // Swap UI state
+    @Published public var swapTarget: SwapTarget?
+
+    @Published public var estimateBand: ProgramTally.EstimateBand = .low_high
+
+    public struct SwapTarget: Identifiable {
+        public let id: UUID = UUID()
+        public let packageID: Package.ID
+        public let moduleID: UUID
+        public let entryID: UUID
+        public let current: ModuleComponent
+    }
+
+    public init(program: Program = []) {
+        self.program = program
+        self.selectedPackageID = program.first?.id
+    }
+
+    public var selectedPackageIndex: Int? {
+        guard let id = selectedPackageID else { return nil }
+        return program.firstIndex(where: { $0.id == id })
+    }
+
+    public func addTemplate(_ template: Package) {
+        let instance = template.package() // NOTE: this currently regenerates id in your code. :contentReference[oaicite:1]{index=1}
+        program.append(instance)
+        selectedPackageID = instance.id
+    }
+
+    public func deletePackage(at offsets: IndexSet) {
+        program.remove(atOffsets: offsets)
+        if selectedPackageIndex == nil {
+            selectedPackageID = program.first?.id
+        }
+    }
+
+    public func movePackage(from: IndexSet, to: Int) {
+        program.move(fromOffsets: from, toOffset: to)
+    }
+
+    public func beginSwap(packageID: Package.ID, moduleID: UUID, entryID: UUID, current: ModuleComponent) {
+        swapTarget = .init(packageID: packageID, moduleID: moduleID, entryID: entryID, current: current)
+    }
+
+    public func commitSwap(newComponent: ModuleComponent) {
+        guard let target = swapTarget else { return }
+
+        guard let pIndex = program.firstIndex(where: { $0.id == target.packageID }) else { return }
+        guard let mIndex = program[pIndex].modules.firstIndex(where: { $0.id == target.moduleID }) else { return }
+        guard let eIndex = program[pIndex].modules[mIndex].entries.firstIndex(where: { $0.id == target.entryID }) else { return }
+
+        program[pIndex].modules[mIndex].entries[eIndex].component = newComponent
+        swapTarget = nil
+    }
+
+    // tallying
+    public var sessionDuration: Int { 60 }
+
+    public var totalSessions: SessionRange {
+        ProgramTally.sessions(program: program, sessionDuration: sessionDuration)
+    }
+
+    public var totalMinutes: MinuteRange {
+        ProgramTally.minutes(program: program)
+    }
+
+    public var totalSessionsLabel: String {
+        let t = totalSessions
+        if t.low == 0 && t.high == 0 { return "—" }
+        if t.low == t.high { return "\(t.low)" }
+        return "\(t.low)–\(t.high)"
+    }
+}
+
+(!): 1 blank lines
+
+
++------------------------------------------------------+
+| Sources/_concept/views-hierarchy/program-views.swift |
++------------------------------------------------------+
+import SwiftUI
+
+public enum ViewVariables {
+    static let program_caption_size: CGFloat = 12
+}
+
+public struct ProgramEditorView: View {
+    @StateObject private var vm = ProgramEditorViewModel(program: [
+        PrebuiltPackage.startersvaardigheden,
+        PrebuiltPackage.hervorming(target: .angst)
+    ])
+
+    @State private var exportError: String?
+    @State private var exportResultPath: String?
+
+    public init() {}
+
+    public var body: some View {
+        NavigationSplitView {
+            PackageListView(vm: vm)
+        } detail: {
+            if let index = vm.selectedPackageIndex {
+                PackageEditorView(package: $vm.program[index])
+            } else {
+                ContentUnavailableView("Selecteer een pakket", systemImage: "square.stack.3d.up")
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Export") {
+                    do {
+                        let dest = try ProgramExport.export(
+                            program: vm.program,
+                            request: .init(
+                                output: FileManager.default.currentDirectoryPath,
+                                title: "Programma-overzicht",
+                                filename: "programma-overzicht",
+                                // pdf: false,
+                                margins: 35
+                            )
+                        )
+
+                        exportResultPath = dest.path
+                    } catch {
+                        exportError = error.localizedDescription
+                    }
+                }
+            }
+        }
+        .alert("Export gelukt", isPresented: Binding(
+            get: { exportResultPath != nil },
+            set: { if !$0 { exportResultPath = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(exportResultPath ?? "")
+        }
+        .alert("Export mislukt", isPresented: Binding(
+            get: { exportError != nil },
+            set: { if !$0 { exportError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(exportError ?? "")
+        }
+        .sheet(item: $vm.swapTarget) { target in
+            ComponentLibraryView(
+                title: "Wissel component",
+                current: target.current,
+                onPick: { picked in
+                    vm.commitSwap(newComponent: picked)
+                },
+                onCancel: {
+                    vm.swapTarget = nil
+                }
+            )
+        }
+    }
+}
+
+public struct PackageListView: View {
+    @ObservedObject public var vm: ProgramEditorViewModel
+
+    public init(vm: ProgramEditorViewModel) {
+        self.vm = vm
+    }
+
+    public var body: some View {
+        List(selection: $vm.selectedPackageID) {
+
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Sessies (schatting)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        Spacer()
+
+                        Text(programSessionsLabel())
+                            .font(.subheadline)
+                            .monospacedDigit()
+                    }
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        Picker("Band", selection: $vm.estimateBand) {
+                            Text("Low–High").tag(ProgramTally.EstimateBand.low_high)
+                            Text("Low–Medium").tag(ProgramTally.EstimateBand.low_medium)
+                            Text("Medium–High").tag(ProgramTally.EstimateBand.medium_high)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize(horizontal: true, vertical: false)
+                        .padding(.horizontal, 2)
+                    }
+                    .scrollClipDisabled()
+                }
+                .padding(.vertical, 4)
+                .padding(.trailing, 6)
+            }
+
+            Section("Pakketten") {
+                ForEach(vm.program) { pkg in
+                    PackageRow(
+                        title: pkg.title,
+                        canMoveUp: canMovePackageUp(pkgID: pkg.id),
+                        canMoveDown: canMovePackageDown(pkgID: pkg.id),
+                        onMoveUp: { movePackageUp(pkgID: pkg.id) },
+                        onMoveDown: { movePackageDown(pkgID: pkg.id) }
+                    )
+                    .tag(pkg.id)
+                    .contextMenu {
+                        Button("Verwijder pakket") {
+                            deletePackageByID(pkg.id)
+                        }
+                    }
+                }
+                .onDelete { offsets in
+                    withAnimation {
+                        vm.deletePackage(at: offsets)
+                    }
+                }
+            }
+
+            Section("Templates") {
+                Button("Startersvaardigheden") {
+                    vm.addTemplate(PrebuiltPackage.startersvaardigheden)
+                }
+
+                Menu("Hervorming") {
+                    ForEach(BehaviorProblem.allCases, id: \.self) { problem in
+                        Button(problem.rawValue) {
+                            vm.addTemplate(PrebuiltPackage.hervorming(target: problem))
+                        }
+                    }
+                }
+            }
+
+            Section("Custom") {
+                Button("Nieuw pakket") {
+                    vm.addCustomPackage()
+                }
+            }
+        }
+        .navigationTitle("Programma")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    deleteSelectedPackage()
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .disabled(vm.selectedPackageID == nil)
+                .help("Verwijder geselecteerd pakket")
+            }
+        }
+        .onDeleteCommand {
+            deleteSelectedPackage()
+        }
+    }
+
+    private func programSessionsLabel(sessionDuration: Int = 60) -> String {
+        let r = ProgramTally.sessions(
+            program: vm.program.filter { $0.include },
+            sessionDuration: sessionDuration,
+            band: vm.estimateBand
+        ).rounded
+
+        if r.low == 0 && r.high == 0 { return "—" }
+        if r.low == r.high { return "\(r.low)" }
+        return "\(r.low)–\(r.high)"
+    }
+
+    private func deleteSelectedPackage() {
+        guard let id = vm.selectedPackageID else { return }
+        deletePackageByID(id)
+    }
+
+    private func deletePackageByID(_ id: Package.ID) {
+        guard let idx = vm.program.firstIndex(where: { $0.id == id }) else { return }
+
+        _ = withAnimation {
+            vm.program.remove(at: idx)
+        }
+
+        if vm.program.indices.contains(idx) {
+            vm.selectedPackageID = vm.program[idx].id
+        } else {
+            vm.selectedPackageID = vm.program.last?.id
+        }
+    }
+
+    private func canMovePackageUp(pkgID: Package.ID) -> Bool {
+        guard let idx = vm.program.firstIndex(where: { $0.id == pkgID }) else { return false }
+        return idx > 0
+    }
+
+    private func canMovePackageDown(pkgID: Package.ID) -> Bool {
+        guard let idx = vm.program.firstIndex(where: { $0.id == pkgID }) else { return false }
+        return idx + 1 < vm.program.count
+    }
+
+    private func movePackageUp(pkgID: Package.ID) {
+        guard let idx = vm.program.firstIndex(where: { $0.id == pkgID }) else { return }
+        guard idx > 0 else { return }
+        withAnimation {
+            vm.program.swapAt(idx, idx - 1)
+        }
+    }
+
+    private func movePackageDown(pkgID: Package.ID) {
+        guard let idx = vm.program.firstIndex(where: { $0.id == pkgID }) else { return }
+        guard idx + 1 < vm.program.count else { return }
+        withAnimation {
+            vm.program.swapAt(idx, idx + 1)
+        }
+    }
+}
+
+private struct PackageRow: View {
+    public let title: String
+    public let canMoveUp: Bool
+    public let canMoveDown: Bool
+    public let onMoveUp: () -> Void
+    public let onMoveDown: () -> Void
+
+    public var body: some View {
+        HStack(spacing: 8) {
+            Text(title)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button("↑") { onMoveUp() }
+                .buttonStyle(.plain)
+                .disabled(!canMoveUp)
+
+            Button("↓") { onMoveDown() }
+                .buttonStyle(.plain)
+                .disabled(!canMoveDown)
+        }
+    }
+}
+
+@MainActor
+public extension ProgramEditorViewModel {
+    func addCustomPackage() {
+        let p = Package(
+            title: "Nieuw pakket",
+            modules: [
+                Module(entries: [])
+            ]
+        )
+
+        program.append(p)
+        selectedPackageID = p.id
+    }
+}
+
+// MARK: - Package editor
+
+public struct PackageEditorView: View {
+    @Binding public var package: Package
+
+    public init(package: Binding<Package>) {
+        self._package = package
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                TextField("Pakket titel", text: $package.title)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.title3)
+
+                Spacer()
+
+                Button {
+                    withAnimation {
+                        package.modules.append(Module(entries: []))
+                    }
+                } label: {
+                    Label("Nieuw module", systemImage: "plus")
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach($package.modules) { $m in
+                    let id = m.id
+                    let idx = package.modules.firstIndex(where: { $0.id == id }) ?? 0
+
+                    ModuleBoxView(
+                        moduleIndex: idx,
+                        moduleCount: package.modules.count,
+                        module: $m,
+                        onDeleteModule: {
+                            guard let i = package.modules.firstIndex(where: { $0.id == id }) else { return }
+                            _ = withAnimation {
+                                package.modules.remove(at: i)
+                            }
+                        },
+                        onMoveUp: {
+                            guard let i = package.modules.firstIndex(where: { $0.id == id }) else { return }
+                            guard i > 0 else { return }
+                            withAnimation {
+                                package.modules.swapAt(i, i - 1)
+                            }
+                        },
+                        onMoveDown: {
+                            guard let i = package.modules.firstIndex(where: { $0.id == id }) else { return }
+                            guard i + 1 < package.modules.count else { return }
+                            withAnimation {
+                                package.modules.swapAt(i, i + 1)
+                            }
+                        }
+                    )
+                    .padding(.horizontal)
+                }
+            }
+            .padding(.vertical, 8)
+
+            Spacer(minLength: 0)
+        }
+        .navigationTitle(package.title)
+    }
+}
+
+// public struct ModuleBoxView: View {
+//     public let moduleIndex: Int
+//     public let moduleCount: Int
+
+//     @Binding public var module: Module
+
+//     public let onDeleteModule: () -> Void
+//     public let onMoveUp: () -> Void
+//     public let onMoveDown: () -> Void
+
+//     @State private var editTargetID: ModuleEntry.ID?
+
+//     public init(
+//         moduleIndex: Int,
+//         moduleCount: Int,
+//         module: Binding<Module>,
+//         onDeleteModule: @escaping () -> Void,
+//         onMoveUp: @escaping () -> Void,
+//         onMoveDown: @escaping () -> Void
+//     ) {
+//         self.moduleIndex = moduleIndex
+//         self.moduleCount = moduleCount
+//         self._module = module
+//         self.onDeleteModule = onDeleteModule
+//         self.onMoveUp = onMoveUp
+//         self.onMoveDown = onMoveDown
+//     }
+
+//     public var body: some View {
+//         VStack(alignment: .leading, spacing: 12) {
+//             HStack(spacing: 10) {
+//                 TextField(
+//                     "Module \(moduleIndex + 1)",
+//                     text: Binding(
+//                         get: { module.title ?? "" },
+//                         set: { module.title = $0.isEmpty ? nil : $0 }
+//                     )
+//                 )
+//                 .textFieldStyle(.plain)
+//                 .font(.headline)
+//                 .frame(minWidth: 220)
+//                 .layoutPriority(1)
+
+//                 Spacer(minLength: 8)
+
+//                 HStack(spacing: 8) {
+//                     Button { onMoveUp() } label: {
+//                         Image(systemName: "chevron.up")
+//                             .imageScale(.medium)
+//                     }
+//                     .buttonStyle(.bordered)
+//                     .frame(width: 36)
+//                     .disabled(moduleIndex == 0)
+//                     .help("Module omhoog")
+
+//                     Button { onMoveDown() } label: {
+//                         Image(systemName: "chevron.down")
+//                             .imageScale(.medium)
+//                     }
+//                     .buttonStyle(.bordered)
+//                     .frame(width: 36)
+//                     .disabled(moduleIndex + 1 >= moduleCount)
+//                     .help("Module omlaag")
+
+//                     Button { onDeleteModule() } label: {
+//                         Image(systemName: "trash")
+//                             .imageScale(.medium)
+//                     }
+//                     .buttonStyle(.borderedProminent)
+//                     .frame(width: 36)
+//                     .help("Verwijder module")
+
+//                     Button {
+//                         withAnimation {
+//                             module.entries.append(
+//                                 ModuleEntry(
+//                                     component: .empty(),
+//                                     placement: .exchangeable,
+//                                     include: true
+//                                 )
+//                             )
+//                         }
+//                     } label: {
+//                         Image(systemName: "plus")
+//                             .imageScale(.medium)
+//                     }
+//                     .buttonStyle(.bordered)
+//                     .frame(width: 36)
+//                     .help("Nieuw item")
+//                 }
+//                 .controlSize(.regular)
+//             }
+
+//             Divider()
+
+//             List {
+//                 ForEach($module.entries, id: \.id) { $entry in
+//                     ModuleEntrySummaryRow(
+//                         entry: $entry,
+//                         onEdit: {
+//                             editTargetID = entry.id
+//                         },
+//                         onDelete: {
+//                             if let i = module.entries.firstIndex(where: { $0.id == entry.id }) {
+//                                 _ = withAnimation {
+//                                     module.entries.remove(at: i)
+//                                 }
+//                             }
+//                         }
+//                     )
+//                 }
+//                 .onMove { from, to in
+//                     withAnimation {
+//                         module.entries.move(fromOffsets: from, toOffset: to)
+//                     }
+//                 }
+//                 .onDelete { offsets in
+//                     withAnimation {
+//                         module.entries.remove(atOffsets: offsets)
+//                     }
+//                 }
+//             }
+//             .listStyle(.plain)
+//             .frame(minHeight: 120)
+//             .frame(maxWidth: .infinity)
+//         }
+//         .padding(12)
+//         .background(.regularMaterial)
+//         .clipShape(RoundedRectangle(cornerRadius: 12))
+//         .sheet(isPresented: Binding(
+//             get: { editTargetID != nil },
+//             set: { if !$0 { editTargetID = nil } }
+//         )) {
+//             if let id = editTargetID,
+//                let index = module.entries.firstIndex(where: { $0.id == id }) {
+//                 ModuleEntryEditSheet(entry: $module.entries[index])
+//             } else {
+//                 Text("Geen item geselecteerd")
+//                     .padding(20)
+//             }
+//         }
+//     }
+// }
+public struct ModuleBoxView: View {
+    public let moduleIndex: Int
+    public let moduleCount: Int
+
+    @Binding public var module: Module
+
+    public let onDeleteModule: () -> Void
+    public let onMoveUp: () -> Void
+    public let onMoveDown: () -> Void
+
+    @State private var editTargetID: ModuleEntry.ID?
+
+    public init(
+        moduleIndex: Int,
+        moduleCount: Int,
+        module: Binding<Module>,
+        onDeleteModule: @escaping () -> Void,
+        onMoveUp: @escaping () -> Void,
+        onMoveDown: @escaping () -> Void
+    ) {
+        self.moduleIndex = moduleIndex
+        self.moduleCount = moduleCount
+        self._module = module
+        self.onDeleteModule = onDeleteModule
+        self.onMoveUp = onMoveUp
+        self.onMoveDown = onMoveDown
+    }
+
+    public var body: some View {
+        let split = splitEntries(module.entries)
+
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                TextField(
+                    "Module \(moduleIndex + 1)",
+                    text: Binding(
+                        get: { module.title ?? "" },
+                        set: { module.title = $0.isEmpty ? nil : $0 }
+                    )
+                )
+                .textFieldStyle(.plain)
+                .font(.headline)
+                .frame(minWidth: 220)
+                .layoutPriority(1)
+
+                Spacer(minLength: 8)
+
+                HStack(spacing: 8) {
+                    Button { onMoveUp() } label: {
+                        Image(systemName: "chevron.up")
+                            .imageScale(.medium)
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(width: 36)
+                    .disabled(moduleIndex == 0)
+                    .help("Module omhoog")
+
+                    Button { onMoveDown() } label: {
+                        Image(systemName: "chevron.down")
+                            .imageScale(.medium)
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(width: 36)
+                    .disabled(moduleIndex + 1 >= moduleCount)
+                    .help("Module omlaag")
+
+                    Button { onDeleteModule() } label: {
+                        Image(systemName: "trash")
+                            .imageScale(.medium)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .frame(width: 36)
+                    .help("Verwijder module")
+
+                    Button {
+                        withAnimation {
+                            module.entries.append(
+                                ModuleEntry(
+                                    component: .empty(),
+                                    placement: .exchangeable,
+                                    include: true
+                                )
+                            )
+                            normalizeEntriesOrderIfNeeded(animated: false)
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .imageScale(.medium)
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(width: 36)
+                    .help("Nieuw item")
+                }
+                .controlSize(.regular)
+            }
+
+            Divider()
+
+            List {
+                Section("Standaard") {
+                    ForEach(split.elementaryIndices, id: \.self) { i in
+                        ModuleEntrySummaryRow(
+                            entry: $module.entries[i],
+                            onEdit: {
+                                editTargetID = module.entries[i].id
+                            },
+                            onDelete: {
+                                deleteEntryByIndex(i)
+                            }
+                        )
+                        .onChange(of: module.entries[i].placement) { _, _  in
+                            normalizeEntriesOrderIfNeeded(animated: true)
+                        }
+                    }
+                    .onMove { from, to in
+                        moveWithinElementary(from: from, to: to)
+                    }
+                    .onDelete { offsets in
+                        deleteByOffsets(offsets, in: split.elementaryIndices)
+                    }
+                }
+
+                Section("Inwisselbaar") {
+                    ForEach(split.exchangeableIndices, id: \.self) { i in
+                        ModuleEntrySummaryRow(
+                            entry: $module.entries[i],
+                            onEdit: {
+                                editTargetID = module.entries[i].id
+                            },
+                            onDelete: {
+                                deleteEntryByIndex(i)
+                            }
+                        )
+                        .onChange(of: module.entries[i].placement) { _, _ in
+                            normalizeEntriesOrderIfNeeded(animated: true)
+                        }
+                    }
+                    .onMove { from, to in
+                        moveWithinExchangeable(from: from, to: to)
+                    }
+                    .onDelete { offsets in
+                        deleteByOffsets(offsets, in: split.exchangeableIndices)
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .frame(minHeight: 120)
+            .frame(maxWidth: .infinity)
+        }
+        .padding(12)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .sheet(isPresented: Binding(
+            get: { editTargetID != nil },
+            set: { if !$0 { editTargetID = nil } }
+        )) {
+            if let id = editTargetID,
+               let index = module.entries.firstIndex(where: { $0.id == id }) {
+                ModuleEntryEditSheet(entry: $module.entries[index])
+            } else {
+                Text("Geen item geselecteerd")
+                    .padding(20)
+            }
+        }
+        .onAppear {
+            normalizeEntriesOrderIfNeeded(animated: false)
+        }
+    }
+
+    // MARK: - Split + normalize
+
+    private struct Split {
+        let elementaryIndices: [Int]
+        let exchangeableIndices: [Int]
+    }
+
+    private func splitEntries(_ entries: [ModuleEntry]) -> Split {
+        var elementary: [Int] = []
+        var exchangeable: [Int] = []
+        elementary.reserveCapacity(entries.count)
+        exchangeable.reserveCapacity(entries.count)
+
+        for i in entries.indices {
+            switch entries[i].placement {
+            case .elementary:
+                elementary.append(i)
+            case .exchangeable:
+                exchangeable.append(i)
+            }
+        }
+
+        return .init(elementaryIndices: elementary, exchangeableIndices: exchangeable)
+    }
+
+    private func normalizeEntriesOrderIfNeeded(animated: Bool) {
+        let current = module.entries
+        let elementary = current.filter { $0.placement == .elementary }
+        let exchangeable = current.filter { $0.placement == .exchangeable }
+        let normalized = elementary + exchangeable
+
+        // Avoid infinite loops / useless updates
+        guard normalized.map(\.id) != current.map(\.id) else { return }
+
+        if animated {
+            withAnimation(.snappy(duration: 0.22)) {
+                module.entries = normalized
+            }
+        } else {
+            module.entries = normalized
+        }
+    }
+
+    // MARK: - Delete helpers
+
+    private func deleteEntryByIndex(_ i: Int) {
+        guard module.entries.indices.contains(i) else { return }
+        _ = withAnimation {
+            module.entries.remove(at: i)
+        }
+    }
+
+    private func deleteByOffsets(_ offsets: IndexSet, in mappedIndices: [Int]) {
+        let actual = offsets
+            .map { mappedIndices[$0] }
+            .sorted(by: >)
+
+        withAnimation {
+            for i in actual {
+                if module.entries.indices.contains(i) {
+                    module.entries.remove(at: i)
+                }
+            }
+        }
+    }
+
+    // MARK: - Move helpers (within each placement band)
+
+    private func moveWithinElementary(from: IndexSet, to: Int) {
+        normalizeEntriesOrderIfNeeded(animated: false)
+
+        let elementaryCount = module.entries.filter { $0.placement == .elementary }.count
+        guard elementaryCount > 0 else { return }
+
+        let base = 0
+        let actualFrom = IndexSet(from.map { base + $0 })
+        let actualTo = base + to
+
+        withAnimation {
+            module.entries.move(fromOffsets: actualFrom, toOffset: actualTo)
+        }
+    }
+
+    private func moveWithinExchangeable(from: IndexSet, to: Int) {
+        normalizeEntriesOrderIfNeeded(animated: false)
+
+        let elementaryCount = module.entries.filter { $0.placement == .elementary }.count
+        let exchangeableCount = module.entries.count - elementaryCount
+        guard exchangeableCount > 0 else { return }
+
+        let base = elementaryCount
+        let actualFrom = IndexSet(from.map { base + $0 })
+        let actualTo = base + to
+
+        withAnimation {
+            module.entries.move(fromOffsets: actualFrom, toOffset: actualTo)
+        }
+    }
+}
+
+public struct ModuleEntrySummaryRow: View {
+    @Binding public var entry: ModuleEntry
+    public var onEdit: () -> Void
+    public var onDelete: () -> Void
+
+    public init(
+        entry: Binding<ModuleEntry>,
+        onEdit: @escaping () -> Void,
+        onDelete: @escaping () -> Void
+    ) {
+        self._entry = entry
+        self.onEdit = onEdit
+        self.onDelete = onDelete
+    }
+
+    public var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            includeCheckbox()
+
+            placementPicker()
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    FormatChips(formats: entry.component.format)
+
+                    Text(entry.component.displayTagline)
+                        .font(.body)
+                        .lineLimit(2)
+                }
+
+                if let caption = entry.component.caption, !caption.isEmpty {
+                    Text(caption)
+                        .font(.system(size: ViewVariables.program_caption_size))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
+                if let allocation = allocationLine() {
+                    Text(allocation)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onEdit()
+            }
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 8) {
+                Button {
+                    onDelete()
+                } label: {
+                    Image(systemName: "trash")
+                        .imageScale(.medium)
+                }
+                .buttonStyle(.bordered)
+                .help("Verwijder")
+
+                Button {
+                    onEdit()
+                } label: {
+                    Image(systemName: "pencil")
+                        .imageScale(.medium)
+                }
+                .buttonStyle(.bordered)
+                .help("Bewerk")
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func allocationLine(sessionDuration: Int = 60) -> String? {
+        guard let alloc = entry.component.allocation else { return nil }
+        let s = alloc.summary(sessionDuration: sessionDuration)
+        if let sess = s.sessionsText {
+            return "Tijd: \(s.minutesText) (\(sess))"
+        }
+        return "Tijd: \(s.minutesText)"
+    }
+
+    private func includeCheckbox() -> some View {
+        Button {
+            entry.include.toggle()
+        } label: {
+            Image(systemName: entry.include ? "checkmark.square.fill" : "square")
+                .imageScale(.medium)
+        }
+        .buttonStyle(.plain)
+        .frame(width: 22, alignment: .leading)
+        .accessibilityLabel(entry.include ? "Inbegrepen" : "Niet inbegrepen")
+    }
+
+    private func placementPicker() -> some View {
+        Picker("", selection: $entry.placement) {
+            Text("Standaard").tag(ModuleComponentPlacement.elementary)
+            Text("Inwisselbaar").tag(ModuleComponentPlacement.exchangeable)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
+// MARK: - Format chips
+
+private struct FormatChips: View {
+    public let formats: Set<LessonFormat>
+
+    public var body: some View {
+        let ordered = formats
+            .map { $0.data.title }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+
+        if ordered.isEmpty {
+            EmptyView()
+        } else {
+            HStack(spacing: 6) {
+                ForEach(ordered, id: \.self) { t in
+                    Text(t)
+                        .font(.caption2)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(.thinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+            }
+        }
+    }
+}
+
+public struct ModuleEntryPreviewCard: View {
+    @Binding public var entry: ModuleEntry
+
+    public init(entry: Binding<ModuleEntry>) {
+        self._entry = entry
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                includeIndicator()
+
+                placementIndicator()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        FormatChips(formats: entry.component.format)
+
+                        Text(entry.component.displayTagline)
+                            .font(.body)
+                            .lineLimit(2)
+                    }
+
+                    if let caption = entry.component.caption, !caption.isEmpty {
+                        Text(caption)
+                            .font(.system(size: ViewVariables.program_caption_size))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+
+                    if let details = entry.component.details, !details.isEmpty {
+                        Text(details)
+                            .font(.system(size: ViewVariables.program_caption_size))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(4)
+                    }
+
+                    let meta = metaLine()
+                    if !meta.isEmpty {
+                        Text(meta)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(12)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func includeIndicator() -> some View {
+        Image(systemName: entry.include ? "checkmark.square.fill" : "square")
+            .imageScale(.medium)
+            .frame(width: 22, alignment: .leading)
+            .accessibilityLabel(entry.include ? "Inbegrepen" : "Niet inbegrepen")
+    }
+
+    private func placementIndicator() -> some View {
+        Text(entry.placement == .elementary ? "Standaard" : "Inwisselbaar")
+            .font(.caption)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.thinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .fixedSize()
+    }
+
+    private func metaLine() -> String {
+        let concepts = entry.component.concepts
+            .map { $0.title_nl }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+
+        let conceptsText: String? = concepts.isEmpty ? nil : "Concepten: " + concepts.joined(separator: ", ")
+
+        let allocationText: String? = {
+            guard let alloc = entry.component.allocation else { return nil }
+            let s = alloc.summary(sessionDuration: 60)
+            if let sess = s.sessionsText { return "Tijd: \(s.minutesText) (\(sess))" }
+            return "Tijd: \(s.minutesText)"
+        }()
+
+        return [
+            allocationText,
+            conceptsText
+        ]
+        .compactMap { $0?.isEmpty == false ? $0 : nil }
+        .joined(separator: " • ")
+    }
+}
+
+public struct ModuleEntryEditSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding public var entry: ModuleEntry
+
+    public init(entry: Binding<ModuleEntry>) {
+        self._entry = entry
+    }
+
+    public var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                ModuleEntryPreviewCard(entry: $entry)
+
+                allocationEditor()
+
+                // MultiSelectGrid(
+                //     title: "Format",
+                //     all: LessonFormat.allCases,
+                //     selected: $entry.component.format,
+                //     label: { $0.rawValue }
+                // )
+
+                // MultiSelectGrid(
+                //     title: "Concepts",
+                //     all: LessonConcept.allCases,
+                //     selected: $entry.component.concepts,
+                //     label: { $0.rawValue }
+                // )
+
+                MultiSelectList(
+                    title: "Format",
+                    all: LessonFormat.allCases,
+                    selected: $entry.component.format,
+                    label: { $0.data.title }
+                )
+
+                MultiSelectList(
+                    title: "Concepts",
+                    all: LessonConcept.allCases,
+                    selected: $entry.component.concepts,
+                    label: { $0.title_nl }
+                )
+
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("Tagline", text: bindingString($entry.component.tagline))
+
+                    TextField("Caption", text: bindingString($entry.component.caption))
+
+                    TextField("Details", text: bindingString($entry.component.details), axis: .vertical)
+                        .lineLimit(3...10)
+                }
+                .textFieldStyle(.roundedBorder)
+
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .frame(minWidth: 560, minHeight: 520)
+            .navigationTitle("Lesonderdeel bewerken")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Sluit") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func allocationEditor() -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Toggle("Tijd allocatie", isOn: Binding(
+                get: { entry.component.allocation != nil },
+                set: { enabled in
+                    if enabled {
+                        if entry.component.allocation == nil {
+                            entry.component.allocation = SessionAllocation(
+                                minutes: MinuteRange(low: 60, medium: nil, high: 60)
+                            )
+                        }
+                    } else {
+                        entry.component.allocation = nil
+                    }
+                }
+            ))
+            .toggleStyle(.checkbox)
+
+            if entry.component.allocation != nil {
+                HStack(spacing: 12) {
+                    IntField(
+                        title: "Minuten (laag)",
+                        value: Binding(
+                            get: { entry.component.allocation?.minutes.low ?? 60 },
+                            set: { newValue in
+                                guard entry.component.allocation != nil else { return }
+                                entry.component.allocation?.minutes.low = newValue
+
+                                // keep medium within [low, high]
+                                if let m = entry.component.allocation?.minutes.medium {
+                                    let lo = entry.component.allocation?.minutes.low ?? newValue
+                                    let hi = entry.component.allocation?.minutes.high ?? lo
+                                    entry.component.allocation?.minutes.medium = max(lo, min(hi, m))
+                                }
+                            }
+                        )
+                    )
+
+                    IntField(
+                        title: "Minuten (medium)",
+                        value: Binding(
+                            get: {
+                                guard let m = entry.component.allocation?.minutes.medium else {
+                                    return entry.component.allocation?.minutes.effectiveMedium() ?? 60
+                                }
+                                return m
+                            },
+                            set: { newValue in
+                                guard entry.component.allocation != nil else { return }
+                                let lo = entry.component.allocation?.minutes.low ?? 0
+                                let hi = entry.component.allocation?.minutes.high ?? lo
+                                entry.component.allocation?.minutes.medium = max(lo, min(hi, newValue))
+                            }
+                        )
+                    )
+
+                    IntField(
+                        title: "Minuten (hoog)",
+                        value: Binding(
+                            get: {
+                                let lo = entry.component.allocation?.minutes.low ?? 60
+                                return entry.component.allocation?.minutes.high ?? lo
+                            },
+                            set: { newValue in
+                                guard entry.component.allocation != nil else { return }
+                                let lo = entry.component.allocation?.minutes.low ?? 0
+                                entry.component.allocation?.minutes.high = max(lo, newValue)
+
+                                // keep medium within [low, high]
+                                if let m = entry.component.allocation?.minutes.medium {
+                                    let hi = entry.component.allocation?.minutes.high ?? max(lo, newValue)
+                                    entry.component.allocation?.minutes.medium = max(lo, min(hi, m))
+                                }
+                            }
+                        )
+                    )
+
+                    Button {
+                        // allow clearing explicit medium; downstream uses effectiveMedium()
+                        entry.component.allocation?.minutes.medium = nil
+                    } label: {
+                        Text("Reset medium")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("Zet medium terug naar automatisch (midden van laag/hoog)")
+
+                    Spacer()
+
+                    if let alloc = entry.component.allocation {
+                        let r = alloc.minutes
+                        Text(sessionsPreview(minutes: r, sessionDuration: 60))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func sessionsPreview(minutes: MinuteRange, sessionDuration: Int = 60) -> String {
+        let s = minutes.session_range(session_duration: sessionDuration)
+
+        let lo = formatSessions(s.low)
+        let mid = formatSessions(s.effectiveMedium())
+        let hi = formatSessions(s.high)
+
+        if nearlyEqual(s.low, s.high) {
+            return "\(lo) sess @ \(sessionDuration) min"
+        }
+
+        // show tri when it actually differs
+        if nearlyEqual(s.low, s.effectiveMedium()) || nearlyEqual(s.effectiveMedium(), s.high) {
+            return "\(lo)–\(hi) sess @ \(sessionDuration) min"
+        }
+
+        return "\(lo) / \(mid) / \(hi) sess @ \(sessionDuration) min"
+    }
+
+    private func bindingString(_ v: Binding<String?>) -> Binding<String> {
+        Binding<String>(
+            get: { v.wrappedValue ?? "" },
+            set: { v.wrappedValue = $0.isEmpty ? nil : $0 }
+        )
+    }
+}
+
+public struct IntField: View {
+    public let title: String
+    @Binding public var value: Int
+
+    private let formatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .none
+        f.allowsFloats = false
+        f.minimum = 0
+        return f
+    }()
+
+    public init(title: String, value: Binding<Int>) {
+        self.title = title
+        self._value = value
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            TextField("", value: $value, formatter: formatter)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 120)
+        }
+    }
+}
+
+// MARK: - Multi select
+public struct MultiSelectGrid<Item: Hashable>: View {
+    public let title: String
+    public let all: [Item]
+    @Binding public var selected: Set<Item>
+    public let spacing: CGFloat
+    public let label: (Item) -> String
+
+    public init(
+        title: String,
+        all: [Item],
+        selected: Binding<Set<Item>>,
+        spacing: CGFloat = 6,
+        label: @escaping (Item) -> String
+    ) {
+        self.title = title
+        self.all = all
+        self._selected = selected
+        self.spacing = spacing
+        self.label = label
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            let columns: [GridItem] = [
+                GridItem(.adaptive(minimum: 90), spacing: spacing, alignment: .leading)
+            ]
+
+            LazyVGrid(columns: columns, alignment: .leading, spacing: spacing) {
+                ForEach(all, id: \.self) { item in
+                    let isOn = selected.contains(item)
+
+                    Text(label(item))
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(isOn ? AnyShapeStyle(.primary.opacity(0.15)) : AnyShapeStyle(.ultraThinMaterial))
+                        .clipShape(Capsule())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Capsule())
+                        .onTapGesture {
+                            toggle(item)
+                        }
+                }
+            }
+        }
+    }
+
+    private func toggle(_ item: Item) {
+        if selected.contains(item) {
+            selected.remove(item)
+        } else {
+            selected.insert(item)
+        }
+    }
+}
+
+public struct MultiSelectList<Item: Hashable>: View {
+    public let title: String
+    public let all: [Item]
+    @Binding public var selected: Set<Item>
+    public let label: (Item) -> String
+
+    public init(
+        title: String,
+        all: [Item],
+        selected: Binding<Set<Item>>,
+        label: @escaping (Item) -> String
+    ) {
+        self.title = title
+        self.all = all
+        self._selected = selected
+        self.label = label
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(all, id: \.self) { item in
+                        let isOn = selected.contains(item)
+
+                        Button {
+                            toggle(item)
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                                    .imageScale(.medium)
+
+                                Text(label(item))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        Divider()
+                    }
+                }
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .frame(maxHeight: 180)
+        }
+    }
+
+    private func toggle(_ item: Item) {
+        if selected.contains(item) {
+            selected.remove(item)
+        } else {
+            selected.insert(item)
+        }
+    }
+}
+
+// MARK: - Component library (kept for later)
+
+public struct ComponentLibraryView: View {
+    public let title: String
+    public let current: ModuleComponent
+    public let onPick: (ModuleComponent) -> Void
+    public let onCancel: () -> Void
+
+    public init(
+        title: String,
+        current: ModuleComponent,
+        onPick: @escaping (ModuleComponent) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.title = title
+        self.current = current
+        self.onPick = onPick
+        self.onCancel = onCancel
+    }
+
+    public var body: some View {
+        NavigationStack {
+            List {
+                Section("Huidig") {
+                    Text(current.tagline ?? "—")
+                }
+
+                Section("Opties") {
+                    ForEach(allComponents(), id: \.self) { component in
+                        Button {
+                            onPick(component)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(component.tagline ?? "—")
+                                Text(summary(component))
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle(title)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Sluit") { onCancel() }
+                }
+            }
+        }
+    }
+
+    private func summary(_ c: ModuleComponent) -> String {
+        let concepts = c.concepts.map(\.rawValue).sorted().joined(separator: ", ")
+        let formats = c.format.map(\.rawValue).sorted().joined(separator: ", ")
+        if concepts.isEmpty && formats.isEmpty { return "" }
+        if formats.isEmpty { return concepts }
+        if concepts.isEmpty { return formats }
+        return "\(concepts) • \(formats)"
+    }
+
+    private func allComponents() -> [ModuleComponent] {
+        return [
+            PrebuiltModuleComponents.Communication.markers_and_overshadowing,
+            PrebuiltModuleComponents.Communication.thresholds_drive_priority,
+            PrebuiltModuleComponents.Communication.classical_conditioning,
+            PrebuiltModuleComponents.Communication.overshadowing,
+            PrebuiltModuleComponents.Equipment.equipment_toys,
+            PrebuiltModuleComponents.BehaviorModification.premack_discharge_energy,
+            PrebuiltModuleComponents.BehaviorModification.capping_dynamic_to_static
+        ]
+    }
+}
+
+(!): 1 blank lines

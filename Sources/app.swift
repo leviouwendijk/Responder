@@ -68,6 +68,12 @@ struct ResponderApp: App {
                           Label("lab", systemImage: "terminal.fill")
                       }
                       .tag(4)
+
+                    ProgramEditorView()
+                      .tabItem {
+                          Label("Program", systemImage: "square.grid.2x2")
+                      }
+                      .tag(5)
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
