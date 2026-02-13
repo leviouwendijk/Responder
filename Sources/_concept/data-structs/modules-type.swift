@@ -17,7 +17,7 @@ public struct Module: Sendable, Codable, Hashable, Identifiable {
     }
 }
 
-public enum ModuleComponentPlacement: String, Sendable, Codable, Hashable {
+public enum ModuleComponentPlacement: String, Sendable, Codable, Hashable, CaseIterable {
     case elementary
     case exchangeable
 }

@@ -226,6 +226,7 @@ public extension PrebuiltModuleComponents {
                 .engagement,
                 .movement,
                 .reward_variability,
+                .contrast,
                 .reinforcement_rate
             ],
             format: [
@@ -237,7 +238,7 @@ public extension PrebuiltModuleComponents {
                     high: 2
                 )
             ),
-            tagline: "Begrip: beweging, variatie, frequentie (interesse-behoud)",
+            tagline: "Begrip: beweging, variatie, contrast, frequentie (interesse-behoud)",
             caption: "De kernprincipes van opbouw naar hoge motivatie / drijf"
         )
 

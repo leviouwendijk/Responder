@@ -66,7 +66,7 @@ public enum PrebuiltModules {
 
     public static func engagement() -> Module {
         Module(
-            title: "Engagement",
+            title: "Betrokkenheid: behoud hoge aantrekkingskracht rondom afleidingen en in diverse omstandigheden",
             entries: [
                 // Elementary (core)
                 .init(component: PrebuiltModuleComponents.Engagement.focus_retention_foundation, placement: .elementary),

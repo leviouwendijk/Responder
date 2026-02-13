@@ -114,6 +114,8 @@ public enum LessonConcept: String, Sendable, Codable, Hashable, CaseIterable {
     case body_pressure
     case spatial_pressure
 
+    case punishment_event
+
     // applied behavior modification
     case habituation
     case desensitization
@@ -233,6 +235,8 @@ public extension LessonConcept {
         case .opposition_reflex: return "opposite-reflex"
         case .body_pressure: return "lichaamsdruk"
         case .spatial_pressure: return "ruimtelijke druk"
+
+        case .punishment_event: return "correctie-handeling (sociaal aspect, fysieke handeling, meer dan disruptie)"
 
         // applied behavior modification
         case .habituation: return "habituatie"

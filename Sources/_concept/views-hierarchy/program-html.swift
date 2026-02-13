@@ -9,19 +9,22 @@ public struct DocDataBox: Sendable {
     public var dogName: String
     public var estimatedSessions: (low: Int, high: Int)?
     public var includedPackages: [String]?
+    public var priceLabel: String?
 
     public init(
         dateLabel: String,
         clientName: String,
         dogName: String,
         estimatedSessions: (low: Int, high: Int)? = nil,
-        includedPackages: [String]? = nil
+        includedPackages: [String]? = nil,
+        priceLabel: String? = nil
     ) {
         self.dateLabel = dateLabel
         self.clientName = clientName
         self.dogName = dogName
         self.estimatedSessions = estimatedSessions
         self.includedPackages = includedPackages
+        self.priceLabel = priceLabel
     }
 
     public func html() -> HTMLFragment {
@@ -52,6 +55,12 @@ public struct DocDataBox: Sendable {
                     docDataPackageLine(label: "", value: pkg)
                 )
             }
+        }
+
+        if let priceLabel, !priceLabel.isEmpty {
+            contentNodes.append(
+                docDataLine(label: "Prijs:", value: priceLabel)
+            )
         }
 
         return [

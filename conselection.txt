@@ -263,6 +263,7 @@ public enum LessonConcept: String, Sendable, Codable, Hashable, CaseIterable {
     case chase
     case food_chase
     case movement
+    case contrast
 
     case attention_retention
     case post_reinforcement_pause
@@ -300,6 +301,8 @@ public enum LessonConcept: String, Sendable, Codable, Hashable, CaseIterable {
     case opposition_reflex
     case body_pressure
     case spatial_pressure
+
+    case punishment_event
 
     // applied behavior modification
     case habituation
@@ -382,6 +385,7 @@ public extension LessonConcept {
         case .chase: return "jagen"
         case .food_chase: return "voerjaagspel"
         case .movement: return "beweging"
+        case .contrast: return "contrast"
 
         case .attention_retention: return "aandacht-behoud"
         case .post_reinforcement_pause: return "post-beloning-pauze"
@@ -419,6 +423,8 @@ public extension LessonConcept {
         case .opposition_reflex: return "opposite-reflex"
         case .body_pressure: return "lichaamsdruk"
         case .spatial_pressure: return "ruimtelijke druk"
+
+        case .punishment_event: return "correctie-handeling (sociaal aspect, fysieke handeling, meer dan disruptie)"
 
         // applied behavior modification
         case .habituation: return "habituatie"
@@ -462,7 +468,7 @@ public struct Module: Sendable, Codable, Hashable, Identifiable {
     }
 }
 
-public enum ModuleComponentPlacement: String, Sendable, Codable, Hashable {
+public enum ModuleComponentPlacement: String, Sendable, Codable, Hashable, CaseIterable {
     case elementary
     case exchangeable
 }
@@ -821,6 +827,7 @@ public extension PrebuiltModuleComponents {
                 .engagement,
                 .movement,
                 .reward_variability,
+                .contrast,
                 .reinforcement_rate
             ],
             format: [
@@ -832,7 +839,7 @@ public extension PrebuiltModuleComponents {
                     high: 2
                 )
             ),
-            tagline: "Begrip: beweging, variatie, frequentie (interesse-behoud)",
+            tagline: "Begrip: beweging, variatie, contrast, frequentie (interesse-behoud)",
             caption: "De kernprincipes van opbouw naar hoge motivatie / drijf"
         )
 
@@ -1325,7 +1332,7 @@ public enum PrebuiltModules {
 
     public static func engagement() -> Module {
         Module(
-            title: "Engagement",
+            title: "Betrokkenheid: behoud hoge aantrekkingskracht rondom afleidingen en in diverse omstandigheden",
             entries: [
                 // Elementary (core)
                 .init(component: PrebuiltModuleComponents.Engagement.focus_retention_foundation, placement: .elementary),
@@ -1404,9 +1411,6 @@ import Interfaces
 
 public enum ProgramExport {
     public struct Request: Sendable {
-        /// Output can be either:
-        /// - a directory path (recommended), OR
-        /// - a full file path (with or without ".pdf")
         public var output: String
 
         public var title: String
@@ -1414,25 +1418,49 @@ public enum ProgramExport {
         public var margins: Double
         public var debugHTML: Bool
 
+        public var estimateBand: ProgramTally.EstimateBand
+        public var tallyPlacements: Set<ModuleComponentPlacement>
+        public var sessionDuration: Int
+
+        // Pricing
+        public var sessionRate: Double
+        public var homeSessions: Int
+        public var travelDistanceKm: Double
+        public var travelRatePerKm: Double
+
         public init(
             output: String = "",
-            title: String = "Programma-overzicht",
+            title: String = "Pakketsamenstelling",
             filename: String = "programma-overzicht",
             margins: Double = 35,
-            debugHTML: Bool = false
+            debugHTML: Bool = false,
+            estimateBand: ProgramTally.EstimateBand = .low_high,
+            tallyPlacements: Set<ModuleComponentPlacement> = [.elementary],
+            sessionDuration: Int = 60,
+            sessionRate: Double = 300,
+            homeSessions: Int = 0,
+            travelDistanceKm: Double = 0,
+            travelRatePerKm: Double = 2.50
         ) {
             self.output = output
             self.title = title
             self.filename = filename
             self.margins = margins
             self.debugHTML = debugHTML
+            self.estimateBand = estimateBand
+            self.tallyPlacements = tallyPlacements
+            self.sessionDuration = sessionDuration
+            self.sessionRate = sessionRate
+            self.homeSessions = homeSessions
+            self.travelDistanceKm = travelDistanceKm
+            self.travelRatePerKm = travelRatePerKm
         }
     }
 
     public static func export(program: [Package], request: Request = .init()) throws -> URL {
         let includedProgram = program.filter { $0.include }
 
-        let overview = makeOverview(program: includedProgram)
+        let overview = makeOverview(program: includedProgram, request: request)
 
         let html = ProgramHTML.build(
             program: includedProgram,
@@ -1476,7 +1504,19 @@ public enum ProgramExport {
         return dest
     }
 
-    private static func makeOverview(program: [Package]) -> DocDataBox {
+    private static let euroFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.locale = Locale(identifier: "nl_NL")
+        f.currencyCode = "EUR"
+        return f
+    }()
+
+    private static func formatEUR(_ value: Double) -> String {
+        euroFormatter.string(from: NSNumber(value: value)) ?? "€ \(String(format: "%.2f", value))"
+    }
+
+    private static func makeOverview(program: [Package], request: Request) -> DocDataBox {
         // Placeholders for now (you said hardcode)
         let clientName = "—"
         let dogName = "—"
@@ -1488,7 +1528,13 @@ public enum ProgramExport {
             return f.string(from: Date())
         }()
 
-        let sessions = ProgramTally.sessions(program: program, sessionDuration: 60)
+        let sessions = ProgramTally.sessions(
+            program: program,
+            sessionDuration: request.sessionDuration,
+            band: request.estimateBand,
+            placements: request.tallyPlacements
+        )
+
         let estimatedSessions: (low: Int, high: Int)? = {
             let r = sessions.rounded
             if r.low == 0 && r.high == 0 { return nil }
@@ -1497,59 +1543,32 @@ public enum ProgramExport {
 
         let includedPackages = program.map(\.title)
 
+        // Pricing:
+        // - session tally uses the estimate band HIGH
+        // - plus travel: homeSessions * travelDistanceKm * travelRatePerKm
+        let pricedSessionsHigh = sessions.rounded.high
+        let sessionCost = Double(pricedSessionsHigh) * max(0, request.sessionRate)
+
+        let travelCost = Double(max(0, request.homeSessions))
+            * max(0, request.travelDistanceKm)
+            * max(0, request.travelRatePerKm)
+
+        let totalPrice = sessionCost + travelCost
+
+        let priceLabel: String? = {
+            if pricedSessionsHigh == 0 && request.homeSessions == 0 { return nil }
+            return formatEUR(totalPrice)
+        }()
+
         return DocDataBox(
             dateLabel: dateLabel,
             clientName: clientName,
             dogName: dogName,
             estimatedSessions: estimatedSessions,
-            includedPackages: includedPackages
+            includedPackages: includedPackages,
+            priceLabel: priceLabel
         )
     }
-
-    // public static func export(program: [Package], request: Request = .init()) throws -> URL {
-    //     let html = ProgramHTML.build(
-    //         // program: program,
-    //         program: program.filter { $0.include },
-    //         title: request.title
-    //     ).render()
-
-    //     let dest = try resolveDestination(request: request)
-
-    //     try FileManager.default.createDirectory(
-    //         at: dest.deletingLastPathComponent(),
-    //         withIntermediateDirectories: true
-    //     )
-
-    //     if request.debugHTML {
-    //         do {
-    //             let debugHTML = dest
-    //                 .deletingPathExtension()
-    //                 .appendingPathExtension("debug.html")
-    //             try html.write(to: debugHTML, atomically: true, encoding: .utf8)
-    //         } catch {
-    //             // ignore
-    //         }
-    //     }
-
-    //     let cssMargins = CSSMargins(request.margins)
-    //     let css = CSSPageSetting(margins: cssMargins)
-
-    //     do {
-    //         try html.weasyPDF(css: css, destination: dest.path)
-    //     } catch {
-    //         logPDFExportFailure(
-    //             error: error,
-    //             destination: dest,
-    //             request: request,
-    //             htmlBytes: html.utf8.count
-    //         )
-    //         throw error
-    //     }
-
-    //     return dest
-    // }
-
-    // MARK: - Destination resolution
 
     private static func resolveDestination(request: Request) throws -> URL {
         let output = normalizePath(request.output)
@@ -1675,6 +1694,250 @@ public enum ProgramExport {
     }
 }
 
+// import Foundation
+// import Interfaces
+
+// public enum ProgramExport {
+//     public struct Request: Sendable {
+//         public var output: String
+
+//         public var title: String
+//         public var filename: String
+//         public var margins: Double
+//         public var debugHTML: Bool
+
+//         public var estimateBand: ProgramTally.EstimateBand
+//         public var tallyPlacements: Set<ModuleComponentPlacement>
+//         public var sessionDuration: Int
+
+//         public init(
+//             output: String = "",
+//             title: String = "Pakketsamenstelling",
+//             filename: String = "programma-overzicht",
+//             margins: Double = 35,
+//             debugHTML: Bool = false,
+//             estimateBand: ProgramTally.EstimateBand = .low_high,
+//             tallyPlacements: Set<ModuleComponentPlacement> = [.elementary],
+//             sessionDuration: Int = 60
+//         ) {
+//             self.output = output
+//             self.title = title
+//             self.filename = filename
+//             self.margins = margins
+//             self.debugHTML = debugHTML
+//             self.estimateBand = estimateBand
+//             self.tallyPlacements = tallyPlacements
+//             self.sessionDuration = sessionDuration
+//         }
+//     }
+
+//     public static func export(program: [Package], request: Request = .init()) throws -> URL {
+//         let includedProgram = program.filter { $0.include }
+
+//         let overview = makeOverview(program: includedProgram, request: request)
+
+//         let html = ProgramHTML.build(
+//             program: includedProgram,
+//             title: request.title,
+//             overview: overview
+//         ).render()
+
+//         let dest = try resolveDestination(request: request)
+
+//         try FileManager.default.createDirectory(
+//             at: dest.deletingLastPathComponent(),
+//             withIntermediateDirectories: true
+//         )
+
+//         if request.debugHTML {
+//             do {
+//                 let debugHTML = dest
+//                     .deletingPathExtension()
+//                     .appendingPathExtension("debug.html")
+//                 try html.write(to: debugHTML, atomically: true, encoding: .utf8)
+//             } catch {
+//                 // ignore
+//             }
+//         }
+
+//         let cssMargins = CSSMargins(request.margins)
+//         let css = CSSPageSetting(margins: cssMargins)
+
+//         do {
+//             try html.weasyPDF(css: css, destination: dest.path)
+//         } catch {
+//             logPDFExportFailure(
+//                 error: error,
+//                 destination: dest,
+//                 request: request,
+//                 htmlBytes: html.utf8.count
+//             )
+//             throw error
+//         }
+
+//         return dest
+//     }
+
+//     private static func makeOverview(program: [Package], request: Request) -> DocDataBox {
+//         // Placeholders for now (you said hardcode)
+//         let clientName = "—"
+//         let dogName = "—"
+
+//         let dateLabel: String = {
+//             let f = DateFormatter()
+//             f.locale = Locale(identifier: "nl_NL")
+//             f.dateFormat = "d MMMM yyyy"
+//             return f.string(from: Date())
+//         }()
+
+//         let sessions = ProgramTally.sessions(
+//             program: program,
+//             sessionDuration: request.sessionDuration,
+//             band: request.estimateBand,
+//             placements: request.tallyPlacements
+//         )
+
+//         let estimatedSessions: (low: Int, high: Int)? = {
+//             let r = sessions.rounded
+//             if r.low == 0 && r.high == 0 { return nil }
+//             return (low: r.low, high: r.high)
+//         }()
+
+//         let includedPackages = program.map(\.title)
+
+//         return DocDataBox(
+//             dateLabel: dateLabel,
+//             clientName: clientName,
+//             dogName: dogName,
+//             estimatedSessions: estimatedSessions,
+//             includedPackages: includedPackages
+//         )
+//     }
+
+//     private static func resolveDestination(request: Request) throws -> URL {
+//         let output = normalizePath(request.output)
+
+//         // Default to ~/Desktop when output is empty OR resolves to "/" (e.g. currentDirectoryPath in apps)
+//         if output.isEmpty || output == "/" {
+//             return try defaultDestinationOnDesktop(request: request)
+//         }
+
+//         var isDir: ObjCBool = false
+//         if FileManager.default.fileExists(atPath: output, isDirectory: &isDir) {
+//             if isDir.boolValue {
+//                 return URL(fileURLWithPath: output, isDirectory: true)
+//                     .appendingPathComponent("\(request.filename).pdf")
+//                     .standardizedFileURL
+//             } else {
+//                 return forcePDFExtension(URL(fileURLWithPath: output, isDirectory: false))
+//                     .standardizedFileURL
+//             }
+//         }
+
+//         let endsWithSlash = output.hasSuffix("/") || output.hasSuffix("\\")
+//         let outURL = URL(fileURLWithPath: output, isDirectory: endsWithSlash)
+
+//         if endsWithSlash {
+//             return outURL
+//                 .appendingPathComponent("\(request.filename).pdf")
+//                 .standardizedFileURL
+//         }
+
+//         let last = outURL.lastPathComponent
+//         if last.contains(".") {
+//             return forcePDFExtension(outURL).standardizedFileURL
+//         } else {
+//             return URL(fileURLWithPath: output, isDirectory: true)
+//                 .appendingPathComponent("\(request.filename).pdf")
+//                 .standardizedFileURL
+//         }
+//     }
+
+//     /// HOME/Desktop
+//     private static func defaultDestinationOnDesktop(request: Request) throws -> URL {
+//         let desktop = try FileManager.default.url(
+//             for: .desktopDirectory,
+//             in: .userDomainMask,
+//             appropriateFor: nil,
+//             create: true
+//         )
+
+//         return desktop
+//             .appendingPathComponent("\(request.filename).pdf")
+//             .standardizedFileURL
+//     }
+
+//     private static func forcePDFExtension(_ url: URL) -> URL {
+//         if url.pathExtension.lowercased() == "pdf" {
+//             return url
+//         }
+
+//         if url.pathExtension.isEmpty {
+//             return url.appendingPathExtension("pdf")
+//         } else {
+//             return url.deletingPathExtension().appendingPathExtension("pdf")
+//         }
+//     }
+
+//     private static func normalizePath(_ path: String) -> String {
+//         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+//         guard !trimmed.isEmpty else { return "" }
+
+//         if trimmed.hasPrefix("~") {
+//             return (trimmed as NSString).expandingTildeInPath
+//         }
+
+//         return trimmed
+//     }
+
+//     // MARK: - Logging
+
+//     private static func logPDFExportFailure(
+//         error: Error,
+//         destination: URL,
+//         request: Request,
+//         htmlBytes: Int
+//     ) {
+//         let ns = error as NSError
+
+//         let destPath = destination.path
+//         let destDir = destination.deletingLastPathComponent().path
+
+//         var dirIsDir: ObjCBool = false
+//         let dirExists = FileManager.default.fileExists(atPath: destDir, isDirectory: &dirIsDir)
+//         let destExists = FileManager.default.fileExists(atPath: destPath)
+
+//         let dirWritable = FileManager.default.isWritableFile(atPath: destDir)
+//         let destWritableIfExists = FileManager.default.isWritableFile(atPath: destPath)
+
+//         let lines: [String] = [
+//             "",
+//             "=== ProgramExport PDF failed ===",
+//             "destination: \(destPath)",
+//             "destination_dir: \(destDir)",
+//             "dir_exists: \(dirExists) (isDir: \(dirIsDir.boolValue))",
+//             "dest_exists: \(destExists)",
+//             "dir_writable: \(dirWritable)",
+//             "dest_writable_if_exists: \(destWritableIfExists)",
+//             "request.output: \(request.output)",
+//             "normalized_output: \(normalizePath(request.output))",
+//             "request.filename: \(request.filename)",
+//             "margins: \(request.margins)",
+//             "debugHTML: \(request.debugHTML)",
+//             "html_bytes: \(htmlBytes)",
+//             "error_type: \(String(reflecting: type(of: error)))",
+//             "localizedDescription: \(error.localizedDescription)",
+//             "NSError.domain: \(ns.domain)",
+//             "NSError.code: \(ns.code)",
+//             ns.userInfo.isEmpty ? "NSError.userInfo: <empty>" : "NSError.userInfo: \(ns.userInfo)",
+//             "=== /ProgramExport ===",
+//             ""
+//         ]
+
+//         fputs(lines.joined(separator: "\n"), stderr)
+//     }
+// }
+
 (!): 1 blank lines
 
 
@@ -1692,19 +1955,22 @@ public struct DocDataBox: Sendable {
     public var dogName: String
     public var estimatedSessions: (low: Int, high: Int)?
     public var includedPackages: [String]?
+    public var priceLabel: String?
 
     public init(
         dateLabel: String,
         clientName: String,
         dogName: String,
         estimatedSessions: (low: Int, high: Int)? = nil,
-        includedPackages: [String]? = nil
+        includedPackages: [String]? = nil,
+        priceLabel: String? = nil
     ) {
         self.dateLabel = dateLabel
         self.clientName = clientName
         self.dogName = dogName
         self.estimatedSessions = estimatedSessions
         self.includedPackages = includedPackages
+        self.priceLabel = priceLabel
     }
 
     public func html() -> HTMLFragment {
@@ -1735,6 +2001,12 @@ public struct DocDataBox: Sendable {
                     docDataPackageLine(label: "", value: pkg)
                 )
             }
+        }
+
+        if let priceLabel, !priceLabel.isEmpty {
+            contentNodes.append(
+                docDataLine(label: "Prijs:", value: priceLabel)
+            )
         }
 
         return [
@@ -2410,12 +2682,19 @@ public enum ProgramTally {
         case medium_high
     }
 
-    /// Returns a rounded tally in the requested band.
-    /// - Important: we round only at the end (after summing precise sessions).
+    private static func shouldCount(
+        _ entry: ModuleEntry,
+        placements: Set<ModuleComponentPlacement>
+    ) -> Bool {
+        guard entry.include else { return false }
+        return placements.contains(entry.placement)
+    }
+
     public static func sessions(
         program: Program,
         sessionDuration: Int = 60,
-        band: EstimateBand = .low_high
+        band: EstimateBand = .low_high,
+        placements: Set<ModuleComponentPlacement> = [.elementary]
     ) -> SessionRange {
         var low: Double = 0
         var medium: Double = 0
@@ -2423,11 +2702,10 @@ public enum ProgramTally {
 
         for pkg in program {
             for module in pkg.modules {
-                for entry in module.entries where entry.include {
+                for entry in module.entries where shouldCount(entry, placements: placements) {
                     guard let alloc = entry.component.allocation else { continue }
 
                     let r = alloc.minutes.session_range(session_duration: sessionDuration)
-
                     low += r.low
                     medium += r.effectiveMedium()
                     high += r.high
@@ -2459,13 +2737,16 @@ public enum ProgramTally {
         )
     }
 
-    public static func minutes(program: Program) -> MinuteRange {
+    public static func minutes(
+        program: Program,
+        placements: Set<ModuleComponentPlacement> = [.elementary]
+    ) -> MinuteRange {
         var low: Int = 0
         var high: Int = 0
 
         for pkg in program {
             for module in pkg.modules {
-                for entry in module.entries where entry.include {
+                for entry in module.entries where shouldCount(entry, placements: placements) {
                     guard let alloc = entry.component.allocation else { continue }
                     low += alloc.minutes.low
                     high += alloc.minutes.high
@@ -2494,6 +2775,27 @@ public final class ProgramEditorViewModel: ObservableObject {
     @Published public var swapTarget: SwapTarget?
 
     @Published public var estimateBand: ProgramTally.EstimateBand = .low_high
+    @Published public var tallyPlacements: Set<ModuleComponentPlacement> = [.elementary]
+
+    // ---------------------------------------------------------
+    // PRICING
+    // ---------------------------------------------------------
+    @Published public var sessionRate: Double = 300
+    @Published public var homeSessions: Int = 0
+    @Published public var travelDistanceKm: Double = 0
+    @Published public var travelRatePerKm: Double = 2.50
+
+    private static let euroFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.locale = Locale(identifier: "nl_NL")
+        f.currencyCode = "EUR"
+        return f
+    }()
+
+    private static func formatEUR(_ value: Double) -> String {
+        euroFormatter.string(from: NSNumber(value: value)) ?? "€ \(String(format: "%.2f", value))"
+    }
 
     public struct SwapTarget: Identifiable {
         public let id: UUID = UUID()
@@ -2514,7 +2816,7 @@ public final class ProgramEditorViewModel: ObservableObject {
     }
 
     public func addTemplate(_ template: Package) {
-        let instance = template.package() // NOTE: this currently regenerates id in your code. :contentReference[oaicite:1]{index=1}
+        let instance = template.package()
         program.append(instance)
         selectedPackageID = instance.id
     }
@@ -2562,7 +2864,127 @@ public final class ProgramEditorViewModel: ObservableObject {
         if t.low == t.high { return "\(t.low)" }
         return "\(t.low)–\(t.high)"
     }
+
+    // ---------------------------------------------------------
+    // PRICING (derived)
+    // ---------------------------------------------------------
+    private var includedProgram: Program {
+        program.filter { $0.include }
+    }
+
+    public var pricedSessionRangeRounded: SessionRange.Rounded {
+        ProgramTally.sessions(
+            program: includedProgram,
+            sessionDuration: sessionDuration,
+            band: estimateBand,
+            placements: tallyPlacements
+        ).rounded
+    }
+
+    /// Uses the "high" value of the currently selected estimate band.
+    public var pricedSessionsHigh: Int {
+        pricedSessionRangeRounded.high
+    }
+
+    public var estimatedSessionCost: Double {
+        Double(pricedSessionsHigh) * max(0, sessionRate)
+    }
+
+    public var estimatedTravelCost: Double {
+        let hs = Double(max(0, homeSessions))
+        let km = max(0, travelDistanceKm)
+        let rate = max(0, travelRatePerKm)
+        return hs * km * rate
+    }
+
+    public var estimatedTotalCost: Double {
+        estimatedSessionCost + estimatedTravelCost
+    }
+
+    public var estimatedTotalCostLabel: String {
+        Self.formatEUR(estimatedTotalCost)
+    }
 }
+
+// @MainActor
+// public final class ProgramEditorViewModel: ObservableObject {
+//     @Published public var program: Program
+//     @Published public var selectedPackageID: Package.ID?
+
+//     // Swap UI state
+//     @Published public var swapTarget: SwapTarget?
+
+//     @Published public var estimateBand: ProgramTally.EstimateBand = .low_high
+//     @Published public var tallyPlacements: Set<ModuleComponentPlacement> = [.elementary]
+
+//     public struct SwapTarget: Identifiable {
+//         public let id: UUID = UUID()
+//         public let packageID: Package.ID
+//         public let moduleID: UUID
+//         public let entryID: UUID
+//         public let current: ModuleComponent
+//     }
+
+//     public init(program: Program = []) {
+//         self.program = program
+//         self.selectedPackageID = program.first?.id
+//     }
+
+//     public var selectedPackageIndex: Int? {
+//         guard let id = selectedPackageID else { return nil }
+//         return program.firstIndex(where: { $0.id == id })
+//     }
+
+//     public func addTemplate(_ template: Package) {
+//         let instance = template.package() // NOTE: this currently regenerates id in your code. :contentReference[oaicite:1]{index=1}
+//         program.append(instance)
+//         selectedPackageID = instance.id
+//     }
+
+//     public func deletePackage(at offsets: IndexSet) {
+//         program.remove(atOffsets: offsets)
+//         if selectedPackageIndex == nil {
+//             selectedPackageID = program.first?.id
+//         }
+//     }
+
+//     public func movePackage(from: IndexSet, to: Int) {
+//         program.move(fromOffsets: from, toOffset: to)
+//     }
+
+//     public func beginSwap(packageID: Package.ID, moduleID: UUID, entryID: UUID, current: ModuleComponent) {
+//         swapTarget = .init(packageID: packageID, moduleID: moduleID, entryID: entryID, current: current)
+//     }
+
+//     public func commitSwap(newComponent: ModuleComponent) {
+//         guard let target = swapTarget else { return }
+
+//         guard let pIndex = program.firstIndex(where: { $0.id == target.packageID }) else { return }
+//         guard let mIndex = program[pIndex].modules.firstIndex(where: { $0.id == target.moduleID }) else { return }
+//         guard let eIndex = program[pIndex].modules[mIndex].entries.firstIndex(where: { $0.id == target.entryID }) else { return }
+
+//         program[pIndex].modules[mIndex].entries[eIndex].component = newComponent
+//         swapTarget = nil
+//     }
+
+//     // tallying
+//     public var sessionDuration: Int { 60 }
+
+//     public var totalSessions: SessionRange {
+//         ProgramTally.sessions(program: program, sessionDuration: sessionDuration)
+//     }
+
+//     public var totalMinutes: MinuteRange {
+//         ProgramTally.minutes(program: program)
+//     }
+
+//     public var totalSessionsLabel: String {
+//         let t = totalSessions
+//         if t.low == 0 && t.high == 0 { return "—" }
+//         if t.low == t.high { return "\(t.low)" }
+//         return "\(t.low)–\(t.high)"
+//     }
+// }
 
 (!): 1 blank lines
 
@@ -2601,14 +3023,32 @@ public struct ProgramEditorView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button("Export") {
                     do {
+                        // let dest = try ProgramExport.export(
+                        //     program: vm.program,
+                        //     request: .init(
+                        //         output: FileManager.default.currentDirectoryPath,
+                        //         // title: "Programma-overzicht",
+                        //         filename: "programma-overzicht",
+                        //         margins: 35,
+                        //         estimateBand: vm.estimateBand,
+                        //         tallyPlacements: vm.tallyPlacements,
+                        //         sessionDuration: vm.sessionDuration
+                        //     )
+                        // )
+
                         let dest = try ProgramExport.export(
                             program: vm.program,
                             request: .init(
                                 output: FileManager.default.currentDirectoryPath,
-                                title: "Programma-overzicht",
                                 filename: "programma-overzicht",
-                                // pdf: false,
-                                margins: 35
+                                margins: 35,
+                                estimateBand: vm.estimateBand,
+                                tallyPlacements: vm.tallyPlacements,
+                                sessionDuration: vm.sessionDuration,
+                                sessionRate: vm.sessionRate,
+                                homeSessions: vm.homeSessions,
+                                travelDistanceKm: vm.travelDistanceKm,
+                                travelRatePerKm: vm.travelRatePerKm
                             )
                         )
 
@@ -2686,6 +3126,75 @@ public struct PackageListView: View {
                         .padding(.horizontal, 2)
                     }
                     .scrollClipDisabled()
+
+                    MultiSelectList(
+                        title: "Tally",
+                        all: ModuleComponentPlacement.allCases,
+                        selected: $vm.tallyPlacements,
+                        label: { placement in
+                            switch placement {
+                            case .elementary: return "Standaard"
+                            case .exchangeable: return "Inwisselbaar"
+                            }
+                        }
+                    )
+                }
+                .padding(.vertical, 4)
+                .padding(.trailing, 6)
+            }
+
+            Section("Prijs") {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("Sessie-tarief")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        TextField("", value: $vm.sessionRate, format: .number.precision(.fractionLength(2)))
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 110)
+                    }
+
+                    HStack {
+                        Text("Thuis-sessies")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        TextField("", value: $vm.homeSessions, format: .number)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 110)
+                    }
+
+                    HStack {
+                        Text("Reisafstand (km)")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        TextField("", value: $vm.travelDistanceKm, format: .number.precision(.fractionLength(1)))
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 110)
+                    }
+
+                    HStack {
+                        Text("Tarief per km")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        TextField("", value: $vm.travelRatePerKm, format: .number.precision(.fractionLength(2)))
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 110)
+                    }
+
+                    Divider()
+                        .padding(.vertical, 2)
+
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Schatting (band high)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        Spacer()
+
+                        Text(vm.estimatedTotalCostLabel)
+                            .font(.subheadline)
+                            .monospacedDigit()
+                    }
                 }
                 .padding(.vertical, 4)
                 .padding(.trailing, 6)
@@ -2755,7 +3264,8 @@ public struct PackageListView: View {
         let r = ProgramTally.sessions(
             program: vm.program.filter { $0.include },
             sessionDuration: sessionDuration,
-            band: vm.estimateBand
+            band: vm.estimateBand,
+            placements: vm.tallyPlacements
         ).rounded
 
         if r.low == 0 && r.high == 0 { return "—" }

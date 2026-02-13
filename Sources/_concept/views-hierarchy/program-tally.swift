@@ -7,12 +7,19 @@ public enum ProgramTally {
         case medium_high
     }
 
-    /// Returns a rounded tally in the requested band.
-    /// - Important: we round only at the end (after summing precise sessions).
+    private static func shouldCount(
+        _ entry: ModuleEntry,
+        placements: Set<ModuleComponentPlacement>
+    ) -> Bool {
+        guard entry.include else { return false }
+        return placements.contains(entry.placement)
+    }
+
     public static func sessions(
         program: Program,
         sessionDuration: Int = 60,
-        band: EstimateBand = .low_high
+        band: EstimateBand = .low_high,
+        placements: Set<ModuleComponentPlacement> = [.elementary]
     ) -> SessionRange {
         var low: Double = 0
         var medium: Double = 0
@@ -20,11 +27,10 @@ public enum ProgramTally {
 
         for pkg in program {
             for module in pkg.modules {
-                for entry in module.entries where entry.include {
+                for entry in module.entries where shouldCount(entry, placements: placements) {
                     guard let alloc = entry.component.allocation else { continue }
 
                     let r = alloc.minutes.session_range(session_duration: sessionDuration)
-
                     low += r.low
                     medium += r.effectiveMedium()
                     high += r.high
@@ -56,13 +62,16 @@ public enum ProgramTally {
         )
     }
 
-    public static func minutes(program: Program) -> MinuteRange {
+    public static func minutes(
+        program: Program,
+        placements: Set<ModuleComponentPlacement> = [.elementary]
+    ) -> MinuteRange {
         var low: Int = 0
         var high: Int = 0
 
         for pkg in program {
             for module in pkg.modules {
-                for entry in module.entries where entry.include {
+                for entry in module.entries where shouldCount(entry, placements: placements) {
                     guard let alloc = entry.component.allocation else { continue }
                     low += alloc.minutes.low
                     high += alloc.minutes.high

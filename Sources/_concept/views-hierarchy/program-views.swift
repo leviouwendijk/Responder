@@ -29,14 +29,32 @@ public struct ProgramEditorView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button("Export") {
                     do {
+                        // let dest = try ProgramExport.export(
+                        //     program: vm.program,
+                        //     request: .init(
+                        //         output: FileManager.default.currentDirectoryPath,
+                        //         // title: "Programma-overzicht",
+                        //         filename: "programma-overzicht",
+                        //         margins: 35,
+                        //         estimateBand: vm.estimateBand,
+                        //         tallyPlacements: vm.tallyPlacements,
+                        //         sessionDuration: vm.sessionDuration
+                        //     )
+                        // )
+
                         let dest = try ProgramExport.export(
                             program: vm.program,
                             request: .init(
                                 output: FileManager.default.currentDirectoryPath,
-                                title: "Programma-overzicht",
                                 filename: "programma-overzicht",
-                                // pdf: false,
-                                margins: 35
+                                margins: 35,
+                                estimateBand: vm.estimateBand,
+                                tallyPlacements: vm.tallyPlacements,
+                                sessionDuration: vm.sessionDuration,
+                                sessionRate: vm.sessionRate,
+                                homeSessions: vm.homeSessions,
+                                travelDistanceKm: vm.travelDistanceKm,
+                                travelRatePerKm: vm.travelRatePerKm
                             )
                         )
 
@@ -114,6 +132,75 @@ public struct PackageListView: View {
                         .padding(.horizontal, 2)
                     }
                     .scrollClipDisabled()
+
+                    MultiSelectList(
+                        title: "Tally",
+                        all: ModuleComponentPlacement.allCases,
+                        selected: $vm.tallyPlacements,
+                        label: { placement in
+                            switch placement {
+                            case .elementary: return "Standaard"
+                            case .exchangeable: return "Inwisselbaar"
+                            }
+                        }
+                    )
+                }
+                .padding(.vertical, 4)
+                .padding(.trailing, 6)
+            }
+
+            Section("Prijs") {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("Sessie-tarief")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        TextField("", value: $vm.sessionRate, format: .number.precision(.fractionLength(2)))
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 110)
+                    }
+
+                    HStack {
+                        Text("Thuis-sessies")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        TextField("", value: $vm.homeSessions, format: .number)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 110)
+                    }
+
+                    HStack {
+                        Text("Reisafstand (km)")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        TextField("", value: $vm.travelDistanceKm, format: .number.precision(.fractionLength(1)))
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 110)
+                    }
+
+                    HStack {
+                        Text("Tarief per km")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        TextField("", value: $vm.travelRatePerKm, format: .number.precision(.fractionLength(2)))
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 110)
+                    }
+
+                    Divider()
+                        .padding(.vertical, 2)
+
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Schatting (band high)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        Spacer()
+
+                        Text(vm.estimatedTotalCostLabel)
+                            .font(.subheadline)
+                            .monospacedDigit()
+                    }
                 }
                 .padding(.vertical, 4)
                 .padding(.trailing, 6)
@@ -183,7 +270,8 @@ public struct PackageListView: View {
         let r = ProgramTally.sessions(
             program: vm.program.filter { $0.include },
             sessionDuration: sessionDuration,
-            band: vm.estimateBand
+            band: vm.estimateBand,
+            placements: vm.tallyPlacements
         ).rounded
 
         if r.low == 0 && r.high == 0 { return "—" }
