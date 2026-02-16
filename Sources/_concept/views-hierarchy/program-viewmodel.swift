@@ -8,7 +8,7 @@ public final class ProgramEditorViewModel: ObservableObject {
     // Swap UI state
     @Published public var swapTarget: SwapTarget?
 
-    @Published public var estimateBand: ProgramTally.EstimateBand = .low_high
+    @Published public var estimateBand: ProgramTally.EstimateBand = .low_medium
     @Published public var tallyPlacements: Set<ModuleComponentPlacement> = [.elementary]
 
     // ---------------------------------------------------------

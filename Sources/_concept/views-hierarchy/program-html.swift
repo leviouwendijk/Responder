@@ -175,32 +175,68 @@ public enum ProgramHTML {
     }
 
     private static func renderProgramBanner(band: ProgramTally.EstimateBand?) -> any HTMLNode {
-        let marker = band?.publicMarker
-        let details = band?.publicDetails
+        // let dots: String? = band.map { b in
+        //     b.dotString(filled: b.dot_spread_count)
+        // }
 
         return HTML.div(["class": "ph-program-banner__inner"]) {
             HTML.div(["class": "ph-program-banner__top"]) {
 
                 HTML.div(["class": "ph-program-banner__title"]) {
-                    HTML.text("Belangrijke indicatie")
+                    // HTML.text("(!) Belangrijk")
+                    HTML.text("Over dit programma")
                 }
 
-                if let marker, let details {
-                    HTML.div(["class": "ph-program-banner__badge"]) {
-                        HTML.span(["class": "ph-program-banner__badge-mark"]) { HTML.text(marker) }
-                        HTML.span(["class": "ph-program-banner__badge-text"]) { HTML.text("band: \(details)") }
-                    }
-                }
+                // if let dots {
+                //     HTML.div(["class": "ph-program-banner__dots"]) {
+                //         // HTML.span(["class": "ph-program-banner__dots-label"]) {
+                //         //     HTML.text("spreiding")
+                //         // }
+                //         HTML.span(["class": "ph-program-banner__dots-value"]) {
+                //             HTML.text(dots)
+                //         }
+                //     }
+                // }
             }
 
             HTML.p(["class": "ph-program-banner__body"]) {
                 HTML.text(
-                    "Dit programma-overzicht is een richtlijn en geeft richting aan de opbouw. " +
-                    "In de praktijk kunnen onderdelen, volgorde en tijdsbesteding wijzigen op basis van voortgang en behoeften. "
+                    "Dit programma-overzicht is een richtlijn en geeft " +
+                    "richting aan de opbouw. " +
+                    "In de praktijk kunnen onderdelen, volgorde en " +
+                    "tijdsbesteding wijzigen op basis van voortgang en behoeften. "
                 )
             }
         }
     }
+
+    // private static func renderProgramBanner(band: ProgramTally.EstimateBand?) -> any HTMLNode {
+    //     let marker = band?.publicMarker
+    //     let details = band?.publicDetails
+
+    //     return HTML.div(["class": "ph-program-banner__inner"]) {
+    //         HTML.div(["class": "ph-program-banner__top"]) {
+
+    //             HTML.div(["class": "ph-program-banner__title"]) {
+    //                 HTML.text("Belangrijke indicatie")
+    //             }
+
+    //             if let marker, let details {
+    //                 HTML.div(["class": "ph-program-banner__badge"]) {
+    //                     HTML.span(["class": "ph-program-banner__badge-mark"]) { HTML.text(marker) }
+    //                     HTML.span(["class": "ph-program-banner__badge-text"]) { HTML.text("band: \(details)") }
+    //                 }
+    //             }
+    //         }
+
+    //         HTML.p(["class": "ph-program-banner__body"]) {
+    //             HTML.text(
+    //                 "Dit programma-overzicht is een richtlijn en geeft richting aan de opbouw. " +
+    //                 "In de praktijk kunnen onderdelen, volgorde en tijdsbesteding wijzigen op basis van voortgang en behoeften. "
+    //             )
+    //         }
+    //     }
+    // }
 
     private static func renderPackage(_ pkg: Package) -> HTMLFragment {
         return [
@@ -858,6 +894,115 @@ public enum ProgramHTMLStyles {
             )
         )
 
+        // // program banner
+        // CSS.rule(
+        //     ".ph-program-banner",
+        //     CSS.decl("margin", "0 0 16px")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__inner",
+        //     CSS.decl("padding", "12px 14px"),
+        //     CSS.decl("background", "#f8fafc"),
+        //     CSS.decl("border", "1px solid #ececf2"),
+        //     CSS.decl("border-radius", "12px")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__top",
+        //     CSS.decl("display", "flex"),
+        //     CSS.decl("justify-content", "space-between"),
+        //     CSS.decl("align-items", "center"),
+        //     CSS.decl("gap", "14px"),
+        //     CSS.decl("margin", "0 0 8px")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__title",
+        //     CSS.decl("font-weight", "700"),
+        //     CSS.decl("font-size", "12.5px"),
+        //     CSS.decl("color", "#111827"),
+        //     CSS.decl("letter-spacing", "0.2px")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__badge",
+        //     CSS.decl("display", "inline-flex"),
+        //     CSS.decl("align-items", "center"),
+        //     CSS.decl("gap", "8px"),
+        //     CSS.decl("flex", "0 0 auto")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__badge-mark",
+        //     CSS.decl("display", "inline-flex"),
+        //     CSS.decl("align-items", "center"),
+        //     CSS.decl("justify-content", "center"),
+        //     CSS.decl("width", "24px"),
+        //     CSS.decl("height", "24px"),
+        //     CSS.decl("border-radius", "999px"),
+        //     CSS.decl("background", "#ffffff"),
+        //     CSS.decl("box-shadow", "inset 0 0 0 1px #ececf2"),
+        //     CSS.decl("font-weight", "800"),
+        //     CSS.decl("font-size", "12px"),
+        //     CSS.decl("color", "#111827")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__badge-text",
+        //     CSS.decl("font-size", "11.5px"),
+        //     CSS.decl("font-weight", "400"),
+        //     CSS.decl("color", "#374151"),
+        //     CSS.decl("white-space", "nowrap"),
+        //     CSS.decl("opacity", "0.95")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__body",
+        //     CSS.decl("margin", "0"),
+        //     CSS.decl("font-size", "12.5px"),
+        //     CSS.decl("color", "#374151"),
+        //     CSS.decl("line-height", "1.45")
+        // )
+
+        // CSS.media(
+        //     "print",
+        //     CSS.rule(
+        //         ".ph-program-banner__inner",
+        //         CSS.decl("break-inside", "avoid"),
+        //         CSS.decl("page-break-inside", "avoid")
+        //     )
+        // )
+
+
+        // CSS.rule(
+        //     ".ph-program-banner__dots",
+        //     CSS.decl("display", "inline-flex"),
+        //     CSS.decl("align-items", "center"),
+        //     CSS.decl("gap", "8px"),
+        //     CSS.decl("flex", "0 0 auto")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__dots-label",
+        //     CSS.decl("font-size", "11px"),
+        //     CSS.decl("font-weight", "600"),
+        //     CSS.decl("letter-spacing", "0.4px"),
+        //     CSS.decl("text-transform", "uppercase"),
+        //     CSS.decl("color", "#6b7280"),
+        //     CSS.decl("opacity", "0.9"),
+        //     CSS.decl("white-space", "nowrap")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__dots-value",
+        //     CSS.decl("font-size", "12px"),
+        //     CSS.decl("font-weight", "800"),
+        //     CSS.decl("letter-spacing", "1.2px"),
+        //     CSS.decl("color", "#111827"),
+        //     CSS.decl("white-space", "nowrap")
+        // )
+
         // program banner
         CSS.rule(
             ".ph-program-banner",
@@ -867,9 +1012,16 @@ public enum ProgramHTMLStyles {
         CSS.rule(
             ".ph-program-banner__inner",
             CSS.decl("padding", "12px 14px"),
-            CSS.decl("background", "#f8fafc"),
-            CSS.decl("border", "1px solid #ececf2"),
-            CSS.decl("border-radius", "12px")
+            CSS.decl("border-radius", "12px"),
+
+            // warning-ish but soft: warm paper tint
+            CSS.decl("background", "#fffbeb"),
+            CSS.decl("border", "1px solid #fde68a"),
+
+            // callout rail
+            CSS.decl("border-left-width", "4px"),
+            CSS.decl("border-left-style", "solid"),
+            CSS.decl("border-left-color", "#f59e0b")
         )
 
         CSS.rule(
@@ -883,50 +1035,38 @@ public enum ProgramHTMLStyles {
 
         CSS.rule(
             ".ph-program-banner__title",
-            CSS.decl("font-weight", "700"),
-            CSS.decl("font-size", "12.5px"),
-            CSS.decl("color", "#111827"),
-            CSS.decl("letter-spacing", "0.2px")
-        )
-
-        CSS.rule(
-            ".ph-program-banner__badge",
-            CSS.decl("display", "inline-flex"),
-            CSS.decl("align-items", "center"),
-            CSS.decl("gap", "8px"),
-            CSS.decl("flex", "0 0 auto")
-        )
-
-        CSS.rule(
-            ".ph-program-banner__badge-mark",
-            CSS.decl("display", "inline-flex"),
-            CSS.decl("align-items", "center"),
-            CSS.decl("justify-content", "center"),
-            CSS.decl("width", "24px"),
-            CSS.decl("height", "24px"),
-            CSS.decl("border-radius", "999px"),
-            CSS.decl("background", "#ffffff"),
-            CSS.decl("box-shadow", "inset 0 0 0 1px #ececf2"),
             CSS.decl("font-weight", "800"),
-            CSS.decl("font-size", "12px"),
-            CSS.decl("color", "#111827")
-        )
-
-        CSS.rule(
-            ".ph-program-banner__badge-text",
-            CSS.decl("font-size", "11.5px"),
-            CSS.decl("font-weight", "400"),
-            CSS.decl("color", "#374151"),
-            CSS.decl("white-space", "nowrap"),
-            CSS.decl("opacity", "0.95")
+            CSS.decl("font-size", "12.5px"),
+            CSS.decl("letter-spacing", "0.3px"),
+            CSS.decl("color", "#92400e")
         )
 
         CSS.rule(
             ".ph-program-banner__body",
             CSS.decl("margin", "0"),
             CSS.decl("font-size", "12.5px"),
-            CSS.decl("color", "#374151"),
+            CSS.decl("color", "#78350f"),
             CSS.decl("line-height", "1.45")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__dots",
+            CSS.decl("display", "inline-flex"),
+            CSS.decl("align-items", "center"),
+            CSS.decl("flex", "0 0 auto"),
+            CSS.decl("padding", "4px 8px"),
+            CSS.decl("border-radius", "999px"),
+            CSS.decl("background", "rgba(255, 255, 255, 0.7)"),
+            CSS.decl("box-shadow", "inset 0 0 0 1px rgba(0,0,0,0.06)")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__dots-value",
+            CSS.decl("font-size", "12px"),
+            CSS.decl("font-weight", "900"),
+            CSS.decl("letter-spacing", "1.4px"),
+            CSS.decl("color", "#92400e"),
+            CSS.decl("white-space", "nowrap")
         )
 
         CSS.media(
