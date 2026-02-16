@@ -5,6 +5,83 @@ public enum ProgramTally {
         case low_high
         case low_medium
         case medium_high
+
+        public var field_label_range_visual: String {
+            switch self {
+            case .low_medium:
+                return "●-●-○"
+            case .low_high:
+                return "●-○-●"
+            case .medium_high:
+                return "○-●-●"
+            }
+        }
+
+        public var dot_spread_count: Int {
+            switch self {
+            case .low_medium: return 1
+            case .low_high: return 2
+            case .medium_high: return 3
+            }
+        }
+
+        public func dotString(filled: Int) -> String {
+            let filledClamped = max(0, min(3, filled))
+            return String(repeating: "●", count: filledClamped)
+                + String(repeating: "○", count: 3 - filledClamped)
+        }
+
+        public var publicMarker: String {
+            switch self {
+            case .low_medium: return "S"
+            case .medium_high: return "M"
+            case .low_high: return "L"
+            }
+        }
+
+        /// Friendly explanation for clients.
+        public var publicDetails: String {
+            switch self {
+            case .low_medium: return "laag–medium"
+            case .medium_high: return "medium–hoog"
+            case .low_high: return "laag–hoog"
+            }
+        }
+
+        /// More internal/technical label, if you ever want it.
+        public var internalLabel: String {
+            switch self {
+            case .low_medium: return "Low–Medium"
+            case .medium_high: return "Medium–High"
+            case .low_high: return "Low–High"
+            }
+        }
+
+        enum Anchor: Sendable, Hashable {
+            case low
+            case medium
+            case high
+
+            public var title: String {
+                switch self {
+                case .low: return "Low"
+                case .medium: return "Medium"
+                case .high: return "High"
+                }
+            }
+        }
+
+        /// Which of Low/Medium/High is NOT part of this band.
+        var excludedAnchor: Anchor {
+            switch self {
+            case .low_medium:
+                return .high
+            case .low_high:
+                return .medium
+            case .medium_high:
+                return .low
+            }
+        }
     }
 
     private static func shouldCount(
@@ -81,4 +158,5 @@ public enum ProgramTally {
 
         return .init(low: low, high: high)
     }
+
 }

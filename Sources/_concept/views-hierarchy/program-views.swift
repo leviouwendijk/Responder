@@ -54,7 +54,8 @@ public struct ProgramEditorView: View {
                                 sessionRate: vm.sessionRate,
                                 homeSessions: vm.homeSessions,
                                 travelDistanceKm: vm.travelDistanceKm,
-                                travelRatePerKm: vm.travelRatePerKm
+                                travelRatePerKm: vm.travelRatePerKm,
+                                includePriceInProgram: vm.includePriceInProgram,
                             )
                         )
 
@@ -96,6 +97,137 @@ public struct ProgramEditorView: View {
     }
 }
 
+private struct BandAnchorsHeader: View {
+    let band: ProgramTally.EstimateBand
+
+    var body: some View {
+        let excluded = band.excludedAnchor
+
+        HStack(spacing: 8) {
+            anchorBox(.low, excluded: excluded)
+            anchorBox(.medium, excluded: excluded)
+            anchorBox(.high, excluded: excluded)
+        }
+    }
+
+    @ViewBuilder
+    private func anchorBox(
+        _ a: ProgramTally.EstimateBand.Anchor,
+        excluded: ProgramTally.EstimateBand.Anchor
+    ) -> some View {
+        let isExcluded = (a == excluded)
+
+        Text(a.title)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(.primary.opacity(0.08), lineWidth: 1)
+            )
+            .opacity(isExcluded ? 0.25 : 1.0)
+    }
+}
+
+private struct PricingBreakdown: View {
+    @ObservedObject var vm: ProgramEditorViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Berekening")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 12) {
+                breakdownCard(
+                    title: "Weighted",
+                    isActive: vm.pricingStrategy == .weighted_average,
+                    debug: vm.pricingDebugWeighted,
+                    baseLine: {
+                        let wHigh = max(0, min(100, vm.weightedHighWeightPercent))
+                        let wLow = 100.0 - wHigh
+                        return "base = \(vm.formatNumber2(wLow / 100.0))×low + \(vm.formatNumber2(wHigh / 100.0))×high"
+                    }()
+                )
+
+                breakdownCard(
+                    title: "Midpoint",
+                    isActive: vm.pricingStrategy == .midpoint,
+                    debug: vm.pricingDebugMidpoint,
+                    baseLine: "base = (low + high) / 2"
+                )
+            }
+        }
+        .padding(12)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    @ViewBuilder
+    private func breakdownCard(
+        title: String,
+        isActive: Bool,
+        debug: ProgramEditorViewModel.PricingDebug,
+        baseLine: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.subheadline)
+                Spacer()
+                Text(isActive ? "actief" : "niet actief")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Group {
+                line("band", "\(debug.bandLow)–\(debug.bandHigh) sess")
+                line("base", "\(vm.formatNumber2(debug.baseSessions)) sess")
+                line("formule", baseLine)
+
+                line("ceil → sessies", "\(debug.sessionsCeiled) sess")
+
+                Divider().padding(.vertical, 2)
+
+                line("sessiekosten",
+                     "\(debug.sessionsCeiled) × \(vm.formatMoney(debug.sessionRate)) = \(vm.formatMoney(debug.sessionCost))")
+
+                line("reis",
+                     "\(debug.homeSessions) × \(vm.formatNumber2(debug.travelDistanceKm)) km × \(vm.formatMoney(debug.travelRatePerKm)) = \(vm.formatMoney(debug.travelCost))")
+
+                line("subtotaal",
+                     "\(vm.formatMoney(debug.sessionCost)) + \(vm.formatMoney(debug.travelCost)) = \(vm.formatMoney(debug.subtotal))")
+
+                line("marge", "\(vm.formatNumber2(debug.marginPercent))%")
+                line("markup", "\(vm.formatMoney(debug.markupAmount))")
+
+                line("totaal",
+                     "\(vm.formatMoney(debug.subtotal)) + \(vm.formatMoney(debug.markupAmount)) = \(vm.formatMoney(debug.totalCost))")
+            }
+            .font(.caption)
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .opacity(isActive ? 1.0 : 0.55)
+    }
+
+    @ViewBuilder
+    private func line(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(label)
+                .frame(width: 90, alignment: .leading)
+            Text(value)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
 public struct PackageListView: View {
     @ObservedObject public var vm: ProgramEditorViewModel
 
@@ -120,18 +252,33 @@ public struct PackageListView: View {
                             .monospacedDigit()
                     }
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        Picker("Band", selection: $vm.estimateBand) {
-                            Text("Low–High").tag(ProgramTally.EstimateBand.low_high)
-                            Text("Low–Medium").tag(ProgramTally.EstimateBand.low_medium)
-                            Text("Medium–High").tag(ProgramTally.EstimateBand.medium_high)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        BandAnchorsHeader(band: vm.estimateBand)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            // Picker("Band", selection: $vm.estimateBand) {
+                            //     Text("Low–High").tag(ProgramTally.EstimateBand.low_high)
+                            //     Text("Low–Medium").tag(ProgramTally.EstimateBand.low_medium)
+                            //     Text("Medium–High").tag(ProgramTally.EstimateBand.medium_high)
+                            // }
+                            Picker("Band", selection: $vm.estimateBand) {
+                                Text(ProgramTally.EstimateBand.low_medium.field_label_range_visual)
+                                    .tag(ProgramTally.EstimateBand.low_medium)
+
+                                Text(ProgramTally.EstimateBand.low_high.field_label_range_visual)
+                                    .tag(ProgramTally.EstimateBand.low_high)
+
+                                Text(ProgramTally.EstimateBand.medium_high.field_label_range_visual)
+                                    .tag(ProgramTally.EstimateBand.medium_high)
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .fixedSize(horizontal: true, vertical: false)
+                            .padding(.horizontal, 2)
                         }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .fixedSize(horizontal: true, vertical: false)
-                        .padding(.horizontal, 2)
+                        .scrollClipDisabled()
                     }
-                    .scrollClipDisabled()
 
                     MultiSelectList(
                         title: "Tally",
@@ -151,69 +298,229 @@ public struct PackageListView: View {
 
             Section("Prijs") {
                 VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Text("Sessie-tarief")
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        TextField("", value: $vm.sessionRate, format: .number.precision(.fractionLength(2)))
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 110)
-                    }
 
-                    HStack {
-                        Text("Thuis-sessies")
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        TextField("", value: $vm.homeSessions, format: .number)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 110)
-                    }
+                    // Toggle row (same visual language as MultiSelectList rows)
+                    Button {
+                        vm.includePriceInProgram.toggle()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: vm.includePriceInProgram ? "checkmark.circle.fill" : "circle")
+                                .imageScale(.medium)
 
-                    HStack {
-                        Text("Reisafstand (km)")
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        TextField("", value: $vm.travelDistanceKm, format: .number.precision(.fractionLength(1)))
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 110)
+                            Text("Prijs opnemen in programma")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .contentShape(Rectangle())
                     }
-
-                    HStack {
-                        Text("Tarief per km")
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        TextField("", value: $vm.travelRatePerKm, format: .number.precision(.fractionLength(2)))
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 110)
-                    }
+                    .buttonStyle(.plain)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
 
                     Divider()
                         .padding(.vertical, 2)
 
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("Schatting (band high)")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text("Sessie-tarief")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            TextField("", value: $vm.sessionRate, format: .number.precision(.fractionLength(2)))
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 110)
+                        }
 
-                        Spacer()
+                        HStack {
+                            Text("Thuis-sessies")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            TextField("", value: $vm.homeSessions, format: .number)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 110)
+                        }
 
-                        Text(vm.estimatedTotalCostLabel)
-                            .font(.subheadline)
-                            .monospacedDigit()
+                        HStack {
+                            Text("Reisafstand (km)")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            TextField("", value: $vm.travelDistanceKm, format: .number.precision(.fractionLength(1)))
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 110)
+                        }
+
+                        HStack {
+                            Text("Tarief per km")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            TextField("", value: $vm.travelRatePerKm, format: .number.precision(.fractionLength(2)))
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 110)
+                        }
+
+                        Divider()
+                            .padding(.vertical, 2)
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Prijsstrategie")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                Picker("Prijsstrategie", selection: $vm.pricingStrategy) {
+                                    Text(PricingStrategy.weighted_average.title)
+                                        .tag(PricingStrategy.weighted_average)
+
+                                    Text(PricingStrategy.midpoint.title)
+                                        .tag(PricingStrategy.midpoint)
+                                }
+                                .pickerStyle(.segmented)
+                                .labelsHidden()
+                                .fixedSize(horizontal: true, vertical: false)
+                                .padding(.horizontal, 2)
+                            }
+                            .scrollClipDisabled()
+
+                            // Weighted settings (visible, disabled when not selected)
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack {
+                                    Text("high weight (%)")
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    TextField(
+                                        "",
+                                        value: $vm.weightedHighWeightPercent,
+                                        format: .number.precision(.fractionLength(0))
+                                    )
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 110)
+                                }
+
+                                HStack {
+                                    Text("marge (%)")
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    TextField(
+                                        "",
+                                        value: $vm.weightedMarginPercent,
+                                        format: .number.precision(.fractionLength(0))
+                                    )
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 110)
+                                }
+                            }
+                            .disabled(vm.pricingStrategy != .weighted_average)
+                            .opacity(vm.pricingStrategy == .weighted_average ? 1.0 : 0.45)
+
+                            // Midpoint settings (visible, disabled when not selected)
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack {
+                                    Text("marge (%)")
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    TextField(
+                                        "",
+                                        value: $vm.midpointMarginPercent,
+                                        format: .number.precision(.fractionLength(0))
+                                    )
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 110)
+                                }
+                            }
+                            .disabled(vm.pricingStrategy != .midpoint)
+                            .opacity(vm.pricingStrategy == .midpoint ? 1.0 : 0.45)
+                        }
+
+                        PricingBreakdown(vm: vm)
+
+                        Divider()
+                            .padding(.vertical, 2)
+
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("Schatting (prijs)")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+
+                            Spacer()
+
+                            Text(vm.estimatedTotalCostLabel)
+                                .font(.subheadline)
+                                .monospacedDigit()
+                        }
                     }
+                    .disabled(!vm.includePriceInProgram)
+                    .opacity(vm.includePriceInProgram ? 1.0 : 0.45)
                 }
                 .padding(.vertical, 4)
                 .padding(.trailing, 6)
             }
 
-            Section("Pakketten") {
+            // Section("Prijs") {
+            //     VStack(alignment: .leading, spacing: 10) {
+            //         HStack {
+            //             Text("Sessie-tarief")
+            //                 .foregroundStyle(.secondary)
+            //             Spacer()
+            //             TextField("", value: $vm.sessionRate, format: .number.precision(.fractionLength(2)))
+            //                 .multilineTextAlignment(.trailing)
+            //                 .frame(width: 110)
+            //         }
+
+            //         HStack {
+            //             Text("Thuis-sessies")
+            //                 .foregroundStyle(.secondary)
+            //             Spacer()
+            //             TextField("", value: $vm.homeSessions, format: .number)
+            //                 .multilineTextAlignment(.trailing)
+            //                 .frame(width: 110)
+            //         }
+
+            //         HStack {
+            //             Text("Reisafstand (km)")
+            //                 .foregroundStyle(.secondary)
+            //             Spacer()
+            //             TextField("", value: $vm.travelDistanceKm, format: .number.precision(.fractionLength(1)))
+            //                 .multilineTextAlignment(.trailing)
+            //                 .frame(width: 110)
+            //         }
+
+            //         HStack {
+            //             Text("Tarief per km")
+            //                 .foregroundStyle(.secondary)
+            //             Spacer()
+            //             TextField("", value: $vm.travelRatePerKm, format: .number.precision(.fractionLength(2)))
+            //                 .multilineTextAlignment(.trailing)
+            //                 .frame(width: 110)
+            //         }
+
+            //         Divider()
+            //             .padding(.vertical, 2)
+
+            //         HStack(alignment: .firstTextBaseline) {
+            //             Text("Schatting (band high)")
+            //                 .font(.subheadline)
+            //                 .foregroundStyle(.secondary)
+
+            //             Spacer()
+
+            //             Text(vm.estimatedTotalCostLabel)
+            //                 .font(.subheadline)
+            //                 .monospacedDigit()
+            //         }
+            //     }
+            //     .padding(.vertical, 4)
+            //     .padding(.trailing, 6)
+            // }
+
+            Section("Pakketsamenstelling") {
                 ForEach(vm.program) { pkg in
                     PackageRow(
                         title: pkg.title,
                         canMoveUp: canMovePackageUp(pkgID: pkg.id),
                         canMoveDown: canMovePackageDown(pkgID: pkg.id),
                         onMoveUp: { movePackageUp(pkgID: pkg.id) },
-                        onMoveDown: { movePackageDown(pkgID: pkg.id) }
+                        onMoveDown: { movePackageDown(pkgID: pkg.id) },
+                        onDelete: { deletePackageByID(pkg.id) }
                     )
                     .tag(pkg.id)
                     .contextMenu {
@@ -331,22 +638,62 @@ private struct PackageRow: View {
     public let canMoveDown: Bool
     public let onMoveUp: () -> Void
     public let onMoveDown: () -> Void
+    public let onDelete: () -> Void
 
     public var body: some View {
         HStack(spacing: 8) {
             Text(title)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            Button("↑") { onMoveUp() }
-                .buttonStyle(.plain)
-                .disabled(!canMoveUp)
+            Button {
+                onMoveUp()
+            } label: {
+                Text("↑")
+            }
+            .buttonStyle(.plain)
+            .disabled(!canMoveUp)
 
-            Button("↓") { onMoveDown() }
-                .buttonStyle(.plain)
-                .disabled(!canMoveDown)
+            Button {
+                onMoveDown()
+            } label: {
+                Text("↓")
+            }
+            .buttonStyle(.plain)
+            .disabled(!canMoveDown)
+
+            Button(role: .destructive) {
+                onDelete()
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.plain)
+            .help("Verwijder pakket")
         }
     }
 }
+
+// private struct PackageRow: View {
+//     public let title: String
+//     public let canMoveUp: Bool
+//     public let canMoveDown: Bool
+//     public let onMoveUp: () -> Void
+//     public let onMoveDown: () -> Void
+
+//     public var body: some View {
+//         HStack(spacing: 8) {
+//             Text(title)
+//                 .frame(maxWidth: .infinity, alignment: .leading)
+
+//             Button("↑") { onMoveUp() }
+//                 .buttonStyle(.plain)
+//                 .disabled(!canMoveUp)
+
+//             Button("↓") { onMoveDown() }
+//                 .buttonStyle(.plain)
+//                 .disabled(!canMoveDown)
+//         }
+//     }
+// }
 
 @MainActor
 public extension ProgramEditorViewModel {

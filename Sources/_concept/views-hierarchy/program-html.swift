@@ -10,6 +10,7 @@ public struct DocDataBox: Sendable {
     public var estimatedSessions: (low: Int, high: Int)?
     public var includedPackages: [String]?
     public var priceLabel: String?
+    public var estimateBand: ProgramTally.EstimateBand?
 
     public init(
         dateLabel: String,
@@ -17,7 +18,8 @@ public struct DocDataBox: Sendable {
         dogName: String,
         estimatedSessions: (low: Int, high: Int)? = nil,
         includedPackages: [String]? = nil,
-        priceLabel: String? = nil
+        priceLabel: String? = nil,
+        estimateBand: ProgramTally.EstimateBand? = nil
     ) {
         self.dateLabel = dateLabel
         self.clientName = clientName
@@ -25,6 +27,7 @@ public struct DocDataBox: Sendable {
         self.estimatedSessions = estimatedSessions
         self.includedPackages = includedPackages
         self.priceLabel = priceLabel
+        self.estimateBand = estimateBand
     }
 
     public func html() -> HTMLFragment {
@@ -39,6 +42,17 @@ public struct DocDataBox: Sendable {
                 docDataLine(
                     label: "Sessies:",
                     value: "\(sessions.low)–\(sessions.high)"
+                )
+            )
+        }
+
+        if let band = estimateBand {
+            let dots = band.dotString(filled: band.dot_spread_count)
+            contentNodes.append(
+                docDataLine(
+                    label: "Programma-spreiding:",
+                    // value: "\(dots)  \(band.publicDetails)"
+                    value: "\(dots)"
                 )
             )
         }
@@ -111,6 +125,10 @@ public enum ProgramHTML {
                             HTML.section(["class": "ph-overview"]) {
                                 overview.html()
                             }
+
+                            HTML.section(["class": "ph-program-banner"]) {
+                                renderProgramBanner(band: overview.estimateBand)
+                            }
                         }
 
                         for pkg in program {
@@ -156,9 +174,42 @@ public enum ProgramHTML {
         }
     }
 
+    private static func renderProgramBanner(band: ProgramTally.EstimateBand?) -> any HTMLNode {
+        let marker = band?.publicMarker
+        let details = band?.publicDetails
+
+        return HTML.div(["class": "ph-program-banner__inner"]) {
+            HTML.div(["class": "ph-program-banner__top"]) {
+
+                HTML.div(["class": "ph-program-banner__title"]) {
+                    HTML.text("Belangrijke indicatie")
+                }
+
+                if let marker, let details {
+                    HTML.div(["class": "ph-program-banner__badge"]) {
+                        HTML.span(["class": "ph-program-banner__badge-mark"]) { HTML.text(marker) }
+                        HTML.span(["class": "ph-program-banner__badge-text"]) { HTML.text("band: \(details)") }
+                    }
+                }
+            }
+
+            HTML.p(["class": "ph-program-banner__body"]) {
+                HTML.text(
+                    "Dit programma-overzicht is een richtlijn en geeft richting aan de opbouw. " +
+                    "In de praktijk kunnen onderdelen, volgorde en tijdsbesteding wijzigen op basis van voortgang en behoeften. "
+                )
+            }
+        }
+    }
+
     private static func renderPackage(_ pkg: Package) -> HTMLFragment {
         return [
             HTML.section(["class": "ph-package"]) {
+
+                HTML.div(["class": "ph-eyebrow ph-eyebrow--package"]) {
+                    HTML.text("PAKKET")
+                }
+
                 HTML.div(["class": "ph-package-title"]) {
                     HTML.text(pkg.title)
                 }
@@ -195,6 +246,10 @@ public enum ProgramHTML {
             HTML.div(["class": "ph-box ph-box--module"]) {
                 HTML.div(["class": "ph-box__head"]) {
                     HTML.div(["class": "ph-box__head-text"]) {
+                        HTML.div(["class": "ph-eyebrow ph-eyebrow--module"]) {
+                            HTML.text("MODULE")
+                        }
+
                         HTML.div(["class": "ph-box__title"]) { HTML.text(header) }
                     }
                 }
@@ -281,6 +336,10 @@ public enum ProgramHTML {
 
         return HTML.div(["class": rowClass]) {
             HTML.div(["class": "ph-component-main"]) {
+                HTML.div(["class": "ph-eyebrow ph-eyebrow--component"]) {
+                    HTML.text("LESONDERDEEL")
+                }
+
                 if !chips.isEmpty {
                     HTML.div(["class": "ph-component-chips"]) {
                         for t in chips {
@@ -301,8 +360,6 @@ public enum ProgramHTML {
             }
         }
     }
-
-    // MARK: - Tagline splitting rule
 
     private static func splitTaglineIfCustom(tagline: String?, fallback: String) -> (label: String?, title: String) {
         guard let tagline, !tagline.isEmpty else {
@@ -409,11 +466,32 @@ public enum ProgramHTMLStyles {
             CSS.decl("text-align", "right")
         )
 
-        // Overview doc data (restored)
+        // // Overview doc data (restored)
+        // CSS.rule(
+        //     ".ph-overview",
+        //     CSS.decl("padding", "12px 14px"),
+        //     CSS.decl("background", "#ffffff"),
+        //     CSS.decl("border", "1px solid #ececf2"),
+        //     CSS.decl("border-radius", "12px"),
+        //     CSS.decl("margin", "0 0 14px")
+        // )
+
+        // CSS.rule(
+        //     ".ph-docdata-box",
+        //     CSS.decl("border", "1px solid #ececf2"),
+        //     CSS.decl("border-radius", "10px"),
+        //     CSS.decl("background", "#fbfbfd"),
+        //     CSS.decl("padding", "10px 12px"),
+        //     CSS.decl("font-size", "12px"),
+        //     CSS.decl("width", "100%"),
+        //     CSS.decl("margin", "0"),
+        //     CSS.decl("white-space", "normal")
+        // )
+
         CSS.rule(
             ".ph-overview",
             CSS.decl("padding", "12px 14px"),
-            CSS.decl("background", "#ffffff"),
+            CSS.decl("background", "#fbfbfd"),
             CSS.decl("border", "1px solid #ececf2"),
             CSS.decl("border-radius", "12px"),
             CSS.decl("margin", "0 0 14px")
@@ -421,14 +499,10 @@ public enum ProgramHTMLStyles {
 
         CSS.rule(
             ".ph-docdata-box",
-            CSS.decl("border", "1px solid #ececf2"),
-            CSS.decl("border-radius", "10px"),
-            CSS.decl("background", "#fbfbfd"),
-            CSS.decl("padding", "10px 12px"),
-            CSS.decl("font-size", "12px"),
-            CSS.decl("width", "100%"),
-            CSS.decl("margin", "0"),
-            CSS.decl("white-space", "normal")
+            CSS.decl("border", "0"),
+            CSS.decl("border-radius", "0"),
+            CSS.decl("background", "transparent"),
+            CSS.decl("padding", "0")
         )
 
         CSS.rule(
@@ -509,14 +583,15 @@ public enum ProgramHTMLStyles {
 
         CSS.rule(
             ".ph-component-row",
-            CSS.decl("padding", "8px 0"),
+            // CSS.decl("padding", "8px 0"),
+            CSS.decl("padding", "10px 0"),
             CSS.decl("border-top", "1px solid #ececf2")
         )
 
         CSS.rule(
             ".ph-component-row:first-child",
             CSS.decl("border-top", "0"),
-            CSS.decl("padding-top", "0")
+            // CSS.decl("padding-top", "0")
         )
 
         // -----------------------------
@@ -538,7 +613,9 @@ public enum ProgramHTMLStyles {
             ".ph-component-main",
             CSS.decl("display", "flex"),
             CSS.decl("flex-direction", "column"),
-            CSS.decl("gap", "6px")
+            CSS.decl("gap", "6px"),
+
+            // CSS.decl("padding-top", "2px")
         )
 
         // CSS.rule(
@@ -632,7 +709,8 @@ public enum ProgramHTMLStyles {
             CSS.decl("padding", "10px 12px"),
             CSS.decl("border", "1px solid #ececf2"),
             CSS.decl("border-radius", "10px"),
-            CSS.decl("background", "#ffffff")
+            // CSS.decl("background", "#ffffff")
+            CSS.decl("background", "#f8fafc")
         )
 
         CSS.rule(
@@ -717,6 +795,147 @@ public enum ProgramHTMLStyles {
         CSS.rule(
             ".ph-package-body .ph-box:last-child",
             CSS.decl("margin-bottom", "0")
+        )
+
+        CSS.rule(
+            ".ph-eyebrow",
+            CSS.decl("font-size", "10px"),
+            CSS.decl("font-weight", "600"),
+            CSS.decl("letter-spacing", "1.1px"),
+            CSS.decl("text-transform", "uppercase"),
+            CSS.decl("color", "#6b7280"),
+            CSS.decl("opacity", "0.85"),
+            CSS.decl("line-height", "1.0")
+        )
+
+        // Spacing tuning: package eyebrow sits close to title but not glued
+        CSS.rule(
+            ".ph-eyebrow--package",
+            CSS.decl("margin", "0 0 4px")
+        )
+
+        // Module eyebrow sits inside the card header; keep it tighter
+        CSS.rule(
+            ".ph-eyebrow--module",
+            CSS.decl("margin", "0 0 3px")
+        )
+
+        CSS.rule(
+            ".ph-eyebrow--component",
+            CSS.decl("font-size", "9px"),
+            CSS.decl("font-weight", "600"),
+            CSS.decl("letter-spacing", "1.0px"),
+            CSS.decl("opacity", "0.60"),
+            CSS.decl("margin", "0 0 2px")
+        )
+
+        // CSS.rule(
+        //     ".ph-exchangeable-box",
+        //     CSS.decl("-webkit-box-decoration-break", "slice"),
+        //     CSS.decl("box-decoration-break", "slice")
+        // )
+
+        CSS.media(
+            "print",
+            CSS.rule(
+                ".ph-exchangeable-box",
+                CSS.decl("break-inside", "auto"),
+                CSS.decl("page-break-inside", "auto")
+            ),
+
+            // Keep the title with the next element (first row)
+            CSS.rule(
+                ".ph-exchangeable-title",
+                CSS.decl("break-after", "avoid"),
+                CSS.decl("page-break-after", "avoid")
+            ),
+
+            // Split by items: each row stays intact, but rows can flow to next page
+            CSS.rule(
+                ".ph-component-list--exchangeable .ph-component-row",
+                CSS.decl("break-inside", "avoid"),
+                CSS.decl("page-break-inside", "avoid")
+            )
+        )
+
+        // program banner
+        CSS.rule(
+            ".ph-program-banner",
+            CSS.decl("margin", "0 0 16px")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__inner",
+            CSS.decl("padding", "12px 14px"),
+            CSS.decl("background", "#f8fafc"),
+            CSS.decl("border", "1px solid #ececf2"),
+            CSS.decl("border-radius", "12px")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__top",
+            CSS.decl("display", "flex"),
+            CSS.decl("justify-content", "space-between"),
+            CSS.decl("align-items", "center"),
+            CSS.decl("gap", "14px"),
+            CSS.decl("margin", "0 0 8px")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__title",
+            CSS.decl("font-weight", "700"),
+            CSS.decl("font-size", "12.5px"),
+            CSS.decl("color", "#111827"),
+            CSS.decl("letter-spacing", "0.2px")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__badge",
+            CSS.decl("display", "inline-flex"),
+            CSS.decl("align-items", "center"),
+            CSS.decl("gap", "8px"),
+            CSS.decl("flex", "0 0 auto")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__badge-mark",
+            CSS.decl("display", "inline-flex"),
+            CSS.decl("align-items", "center"),
+            CSS.decl("justify-content", "center"),
+            CSS.decl("width", "24px"),
+            CSS.decl("height", "24px"),
+            CSS.decl("border-radius", "999px"),
+            CSS.decl("background", "#ffffff"),
+            CSS.decl("box-shadow", "inset 0 0 0 1px #ececf2"),
+            CSS.decl("font-weight", "800"),
+            CSS.decl("font-size", "12px"),
+            CSS.decl("color", "#111827")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__badge-text",
+            CSS.decl("font-size", "11.5px"),
+            CSS.decl("font-weight", "400"),
+            CSS.decl("color", "#374151"),
+            CSS.decl("white-space", "nowrap"),
+            CSS.decl("opacity", "0.95")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__body",
+            CSS.decl("margin", "0"),
+            CSS.decl("font-size", "12.5px"),
+            CSS.decl("color", "#374151"),
+            CSS.decl("line-height", "1.45")
+        )
+
+        CSS.media(
+            "print",
+            CSS.rule(
+                ".ph-program-banner__inner",
+                CSS.decl("break-inside", "avoid"),
+                CSS.decl("page-break-inside", "avoid")
+            )
         )
     }
 }

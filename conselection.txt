@@ -1428,6 +1428,8 @@ public enum ProgramExport {
         public var travelDistanceKm: Double
         public var travelRatePerKm: Double
 
+        public var includePriceInProgram: Bool
+
         public init(
             output: String = "",
             title: String = "Pakketsamenstelling",
@@ -1440,7 +1442,8 @@ public enum ProgramExport {
             sessionRate: Double = 300,
             homeSessions: Int = 0,
             travelDistanceKm: Double = 0,
-            travelRatePerKm: Double = 2.50
+            travelRatePerKm: Double = 2.50,
+            includePriceInProgram: Bool = true,
         ) {
             self.output = output
             self.title = title
@@ -1454,6 +1457,7 @@ public enum ProgramExport {
             self.homeSessions = homeSessions
             self.travelDistanceKm = travelDistanceKm
             self.travelRatePerKm = travelRatePerKm
+            self.includePriceInProgram = includePriceInProgram
         }
     }
 
@@ -1556,6 +1560,7 @@ public enum ProgramExport {
         let totalPrice = sessionCost + travelCost
 
         let priceLabel: String? = {
+            guard request.includePriceInProgram else { return nil }
             if pricedSessionsHigh == 0 && request.homeSessions == 0 { return nil }
             return formatEUR(totalPrice)
         }()
@@ -1566,7 +1571,9 @@ public enum ProgramExport {
             dogName: dogName,
             estimatedSessions: estimatedSessions,
             includedPackages: includedPackages,
-            priceLabel: priceLabel
+            priceLabel: priceLabel,
+            // adding for dot spread
+            estimateBand: request.estimateBand
         )
     }
 
@@ -1956,6 +1963,7 @@ public struct DocDataBox: Sendable {
     public var estimatedSessions: (low: Int, high: Int)?
     public var includedPackages: [String]?
     public var priceLabel: String?
+    public var estimateBand: ProgramTally.EstimateBand?
 
     public init(
         dateLabel: String,
@@ -1963,7 +1971,8 @@ public struct DocDataBox: Sendable {
         dogName: String,
         estimatedSessions: (low: Int, high: Int)? = nil,
         includedPackages: [String]? = nil,
-        priceLabel: String? = nil
+        priceLabel: String? = nil,
+        estimateBand: ProgramTally.EstimateBand? = nil
     ) {
         self.dateLabel = dateLabel
         self.clientName = clientName
@@ -1971,6 +1980,7 @@ public struct DocDataBox: Sendable {
         self.estimatedSessions = estimatedSessions
         self.includedPackages = includedPackages
         self.priceLabel = priceLabel
+        self.estimateBand = estimateBand
     }
 
     public func html() -> HTMLFragment {
@@ -1985,6 +1995,17 @@ public struct DocDataBox: Sendable {
                 docDataLine(
                     label: "Sessies:",
                     value: "\(sessions.low)–\(sessions.high)"
+                )
+            )
+        }
+
+        if let band = estimateBand {
+            let dots = band.dotString(filled: band.dot_spread_count)
+            contentNodes.append(
+                docDataLine(
+                    label: "Programma-spreiding:",
+                    // value: "\(dots)  \(band.publicDetails)"
+                    value: "\(dots)"
                 )
             )
         }
@@ -2057,6 +2078,10 @@ public enum ProgramHTML {
                             HTML.section(["class": "ph-overview"]) {
                                 overview.html()
                             }
+
+                            HTML.section(["class": "ph-program-banner"]) {
+                                renderProgramBanner(band: overview.estimateBand)
+                            }
                         }
 
                         for pkg in program {
@@ -2102,9 +2127,42 @@ public enum ProgramHTML {
         }
     }
 
+    private static func renderProgramBanner(band: ProgramTally.EstimateBand?) -> any HTMLNode {
+        let marker = band?.publicMarker
+        let details = band?.publicDetails
+
+        return HTML.div(["class": "ph-program-banner__inner"]) {
+            HTML.div(["class": "ph-program-banner__top"]) {
+
+                HTML.div(["class": "ph-program-banner__title"]) {
+                    HTML.text("Belangrijke indicatie")
+                }
+
+                if let marker, let details {
+                    HTML.div(["class": "ph-program-banner__badge"]) {
+                        HTML.span(["class": "ph-program-banner__badge-mark"]) { HTML.text(marker) }
+                        HTML.span(["class": "ph-program-banner__badge-text"]) { HTML.text("band: \(details)") }
+                    }
+                }
+            }
+
+            HTML.p(["class": "ph-program-banner__body"]) {
+                HTML.text(
+                    "Dit programma-overzicht is een richtlijn en geeft richting aan de opbouw. " +
+                    "In de praktijk kunnen onderdelen, volgorde en tijdsbesteding wijzigen op basis van voortgang en behoeften. "
+                )
+            }
+        }
+    }
+
     private static func renderPackage(_ pkg: Package) -> HTMLFragment {
         return [
             HTML.section(["class": "ph-package"]) {
+
+                HTML.div(["class": "ph-eyebrow ph-eyebrow--package"]) {
+                    HTML.text("PAKKET")
+                }
+
                 HTML.div(["class": "ph-package-title"]) {
                     HTML.text(pkg.title)
                 }
@@ -2141,6 +2199,10 @@ public enum ProgramHTML {
             HTML.div(["class": "ph-box ph-box--module"]) {
                 HTML.div(["class": "ph-box__head"]) {
                     HTML.div(["class": "ph-box__head-text"]) {
+                        HTML.div(["class": "ph-eyebrow ph-eyebrow--module"]) {
+                            HTML.text("MODULE")
+                        }
+
                         HTML.div(["class": "ph-box__title"]) { HTML.text(header) }
                     }
                 }
@@ -2227,6 +2289,10 @@ public enum ProgramHTML {
 
         return HTML.div(["class": rowClass]) {
             HTML.div(["class": "ph-component-main"]) {
+                HTML.div(["class": "ph-eyebrow ph-eyebrow--component"]) {
+                    HTML.text("LESONDERDEEL")
+                }
+
                 if !chips.isEmpty {
                     HTML.div(["class": "ph-component-chips"]) {
                         for t in chips {
@@ -2247,8 +2313,6 @@ public enum ProgramHTML {
             }
         }
     }
-
-    // MARK: - Tagline splitting rule
 
     private static func splitTaglineIfCustom(tagline: String?, fallback: String) -> (label: String?, title: String) {
         guard let tagline, !tagline.isEmpty else {
@@ -2355,11 +2419,32 @@ public enum ProgramHTMLStyles {
             CSS.decl("text-align", "right")
         )
 
-        // Overview doc data (restored)
+        // // Overview doc data (restored)
+        // CSS.rule(
+        //     ".ph-overview",
+        //     CSS.decl("padding", "12px 14px"),
+        //     CSS.decl("background", "#ffffff"),
+        //     CSS.decl("border", "1px solid #ececf2"),
+        //     CSS.decl("border-radius", "12px"),
+        //     CSS.decl("margin", "0 0 14px")
+        // )
+
+        // CSS.rule(
+        //     ".ph-docdata-box",
+        //     CSS.decl("border", "1px solid #ececf2"),
+        //     CSS.decl("border-radius", "10px"),
+        //     CSS.decl("background", "#fbfbfd"),
+        //     CSS.decl("padding", "10px 12px"),
+        //     CSS.decl("font-size", "12px"),
+        //     CSS.decl("width", "100%"),
+        //     CSS.decl("margin", "0"),
+        //     CSS.decl("white-space", "normal")
+        // )
+
         CSS.rule(
             ".ph-overview",
             CSS.decl("padding", "12px 14px"),
-            CSS.decl("background", "#ffffff"),
+            CSS.decl("background", "#fbfbfd"),
             CSS.decl("border", "1px solid #ececf2"),
             CSS.decl("border-radius", "12px"),
             CSS.decl("margin", "0 0 14px")
@@ -2367,14 +2452,10 @@ public enum ProgramHTMLStyles {
 
         CSS.rule(
             ".ph-docdata-box",
-            CSS.decl("border", "1px solid #ececf2"),
-            CSS.decl("border-radius", "10px"),
-            CSS.decl("background", "#fbfbfd"),
-            CSS.decl("padding", "10px 12px"),
-            CSS.decl("font-size", "12px"),
-            CSS.decl("width", "100%"),
-            CSS.decl("margin", "0"),
-            CSS.decl("white-space", "normal")
+            CSS.decl("border", "0"),
+            CSS.decl("border-radius", "0"),
+            CSS.decl("background", "transparent"),
+            CSS.decl("padding", "0")
         )
 
         CSS.rule(
@@ -2455,14 +2536,15 @@ public enum ProgramHTMLStyles {
 
         CSS.rule(
             ".ph-component-row",
-            CSS.decl("padding", "8px 0"),
+            // CSS.decl("padding", "8px 0"),
+            CSS.decl("padding", "10px 0"),
             CSS.decl("border-top", "1px solid #ececf2")
         )
 
         CSS.rule(
             ".ph-component-row:first-child",
             CSS.decl("border-top", "0"),
-            CSS.decl("padding-top", "0")
+            // CSS.decl("padding-top", "0")
         )
 
         // -----------------------------
@@ -2484,7 +2566,9 @@ public enum ProgramHTMLStyles {
             ".ph-component-main",
             CSS.decl("display", "flex"),
             CSS.decl("flex-direction", "column"),
-            CSS.decl("gap", "6px")
+            CSS.decl("gap", "6px"),
+
+            // CSS.decl("padding-top", "2px")
         )
 
         // CSS.rule(
@@ -2578,7 +2662,8 @@ public enum ProgramHTMLStyles {
             CSS.decl("padding", "10px 12px"),
             CSS.decl("border", "1px solid #ececf2"),
             CSS.decl("border-radius", "10px"),
-            CSS.decl("background", "#ffffff")
+            // CSS.decl("background", "#ffffff")
+            CSS.decl("background", "#f8fafc")
         )
 
         CSS.rule(
@@ -2664,6 +2749,167 @@ public enum ProgramHTMLStyles {
             ".ph-package-body .ph-box:last-child",
             CSS.decl("margin-bottom", "0")
         )
+
+        CSS.rule(
+            ".ph-eyebrow",
+            CSS.decl("font-size", "10px"),
+            CSS.decl("font-weight", "600"),
+            CSS.decl("letter-spacing", "1.1px"),
+            CSS.decl("text-transform", "uppercase"),
+            CSS.decl("color", "#6b7280"),
+            CSS.decl("opacity", "0.85"),
+            CSS.decl("line-height", "1.0")
+        )
+
+        // Spacing tuning: package eyebrow sits close to title but not glued
+        CSS.rule(
+            ".ph-eyebrow--package",
+            CSS.decl("margin", "0 0 4px")
+        )
+
+        // Module eyebrow sits inside the card header; keep it tighter
+        CSS.rule(
+            ".ph-eyebrow--module",
+            CSS.decl("margin", "0 0 3px")
+        )
+
+        CSS.rule(
+            ".ph-eyebrow--component",
+            CSS.decl("font-size", "9px"),
+            CSS.decl("font-weight", "600"),
+            CSS.decl("letter-spacing", "1.0px"),
+            CSS.decl("opacity", "0.60"),
+            CSS.decl("margin", "0 0 2px")
+        )
+
+        // CSS.rule(
+        //     ".ph-exchangeable-box",
+        //     CSS.decl("-webkit-box-decoration-break", "slice"),
+        //     CSS.decl("box-decoration-break", "slice")
+        // )
+
+        CSS.media(
+            "print",
+            CSS.rule(
+                ".ph-exchangeable-box",
+                CSS.decl("break-inside", "auto"),
+                CSS.decl("page-break-inside", "auto")
+            ),
+
+            // Keep the title with the next element (first row)
+            CSS.rule(
+                ".ph-exchangeable-title",
+                CSS.decl("break-after", "avoid"),
+                CSS.decl("page-break-after", "avoid")
+            ),
+
+            // Split by items: each row stays intact, but rows can flow to next page
+            CSS.rule(
+                ".ph-component-list--exchangeable .ph-component-row",
+                CSS.decl("break-inside", "avoid"),
+                CSS.decl("page-break-inside", "avoid")
+            )
+        )
+
+        // program banner
+        CSS.rule(
+            ".ph-program-banner",
+            CSS.decl("margin", "0 0 16px")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__inner",
+            CSS.decl("padding", "12px 14px"),
+            CSS.decl("background", "#f8fafc"),
+            CSS.decl("border", "1px solid #ececf2"),
+            CSS.decl("border-radius", "12px")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__top",
+            CSS.decl("display", "flex"),
+            CSS.decl("justify-content", "space-between"),
+            CSS.decl("align-items", "center"),
+            CSS.decl("gap", "14px"),
+            CSS.decl("margin", "0 0 8px")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__title",
+            CSS.decl("font-weight", "700"),
+            CSS.decl("font-size", "12.5px"),
+            CSS.decl("color", "#111827"),
+            CSS.decl("letter-spacing", "0.2px")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__badge",
+            CSS.decl("display", "inline-flex"),
+            CSS.decl("align-items", "center"),
+            CSS.decl("gap", "8px"),
+            CSS.decl("flex", "0 0 auto")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__badge-mark",
+            CSS.decl("display", "inline-flex"),
+            CSS.decl("align-items", "center"),
+            CSS.decl("justify-content", "center"),
+            CSS.decl("width", "24px"),
+            CSS.decl("height", "24px"),
+            CSS.decl("border-radius", "999px"),
+            CSS.decl("background", "#ffffff"),
+            CSS.decl("box-shadow", "inset 0 0 0 1px #ececf2"),
+            CSS.decl("font-weight", "800"),
+            CSS.decl("font-size", "12px"),
+            CSS.decl("color", "#111827")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__badge-text",
+            CSS.decl("font-size", "11.5px"),
+            CSS.decl("font-weight", "400"),
+            CSS.decl("color", "#374151"),
+            CSS.decl("white-space", "nowrap"),
+            CSS.decl("opacity", "0.95")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__body",
+            CSS.decl("margin", "0"),
+            CSS.decl("font-size", "12.5px"),
+            CSS.decl("color", "#374151"),
+            CSS.decl("line-height", "1.45")
+        )
+
+        CSS.media(
+            "print",
+            CSS.rule(
+                ".ph-program-banner__inner",
+                CSS.decl("break-inside", "avoid"),
+                CSS.decl("page-break-inside", "avoid")
+            )
+        )
+    }
+}
+
+(!): 1 blank lines
+
+
++-----------------------------------------------------------------+
+| Sources/_concept/views-hierarchy/program-pricing-strategy.swift |
++-----------------------------------------------------------------+
+import Foundation
+
+public enum PricingStrategy: String, Sendable, Hashable, CaseIterable {
+    case weighted_average
+    case midpoint
+
+    public var title: String {
+        switch self {
+        case .weighted_average: return "Weighted"
+        case .midpoint: return "Midpoint"
+        }
     }
 }
 
@@ -2680,6 +2926,83 @@ public enum ProgramTally {
         case low_high
         case low_medium
         case medium_high
+
+        public var field_label_range_visual: String {
+            switch self {
+            case .low_medium:
+                return "●-●-○"
+            case .low_high:
+                return "●-○-●"
+            case .medium_high:
+                return "○-●-●"
+            }
+        }
+
+        public var dot_spread_count: Int {
+            switch self {
+            case .low_medium: return 1
+            case .low_high: return 2
+            case .medium_high: return 3
+            }
+        }
+
+        public func dotString(filled: Int) -> String {
+            let filledClamped = max(0, min(3, filled))
+            return String(repeating: "●", count: filledClamped)
+                + String(repeating: "○", count: 3 - filledClamped)
+        }
+
+        public var publicMarker: String {
+            switch self {
+            case .low_medium: return "S"
+            case .medium_high: return "M"
+            case .low_high: return "L"
+            }
+        }
+
+        /// Friendly explanation for clients.
+        public var publicDetails: String {
+            switch self {
+            case .low_medium: return "laag–medium"
+            case .medium_high: return "medium–hoog"
+            case .low_high: return "laag–hoog"
+            }
+        }
+
+        /// More internal/technical label, if you ever want it.
+        public var internalLabel: String {
+            switch self {
+            case .low_medium: return "Low–Medium"
+            case .medium_high: return "Medium–High"
+            case .low_high: return "Low–High"
+            }
+        }
+
+        enum Anchor: Sendable, Hashable {
+            case low
+            case medium
+            case high
+
+            public var title: String {
+                switch self {
+                case .low: return "Low"
+                case .medium: return "Medium"
+                case .high: return "High"
+                }
+            }
+        }
+
+        /// Which of Low/Medium/High is NOT part of this band.
+        var excludedAnchor: Anchor {
+            switch self {
+            case .low_medium:
+                return .high
+            case .low_high:
+                return .medium
+            case .medium_high:
+                return .low
+            }
+        }
     }
 
     private static func shouldCount(
@@ -2756,6 +3079,7 @@ public enum ProgramTally {
 
         return .init(low: low, high: high)
     }
+
 }
 
 (!): 1 blank lines
@@ -2785,11 +3109,33 @@ public final class ProgramEditorViewModel: ObservableObject {
     @Published public var travelDistanceKm: Double = 0
     @Published public var travelRatePerKm: Double = 2.50
 
+    @Published public var includePriceInProgram: Bool = true
+
+    // ---------------------------------------------------------
+    // PRICING STRATEGY
+    // ---------------------------------------------------------
+    @Published public var pricingStrategy: PricingStrategy = .weighted_average
+    @Published public var midpointMarginPercent: Double = 15
+    @Published public var weightedHighWeightPercent: Double = 65
+    @Published public var weightedMarginPercent: Double = 0
+
     private static let euroFormatter: NumberFormatter = {
         let f = NumberFormatter()
         f.numberStyle = .currency
-        f.locale = Locale(identifier: "nl_NL")
+
+        // UI preference: 1,234.56 (dot decimal, comma grouping)
+        f.locale = Locale(identifier: "en_US_POSIX")
         f.currencyCode = "EUR"
+        f.currencySymbol = "€"
+
+        f.usesGroupingSeparator = true
+        f.groupingSeparator = ","
+        f.decimalSeparator = "."
+
+        // Keep 2 decimals for money
+        f.minimumFractionDigits = 2
+        f.maximumFractionDigits = 2
+
         return f
     }()
 
@@ -2881,13 +3227,45 @@ public final class ProgramEditorViewModel: ObservableObject {
         ).rounded
     }
 
-    /// Uses the "high" value of the currently selected estimate band.
-    public var pricedSessionsHigh: Int {
-        pricedSessionRangeRounded.high
+    // /// Uses the "high" value of the currently selected estimate band.
+    // public var pricedSessionsHigh: Int {
+    //     pricedSessionRangeRounded.high
+    // }
+
+    // public var estimatedSessionCost: Double {
+    //     Double(pricedSessionsHigh) * max(0, sessionRate)
+    // }
+
+    // private func clamp(_ v: Double, _ lo: Double, _ hi: Double) -> Double {
+    //     max(lo, min(hi, v))
+    // }
+
+    private var pricedSessionsForPricing: Int {
+        let r = pricedSessionRangeRounded
+        let low = Double(max(0, r.low))
+        let high = Double(max(0, r.high))
+
+        let base: Double
+        let marginFraction: Double
+
+        switch pricingStrategy {
+        case .midpoint:
+            base = (low + high) / 2.0
+            marginFraction = clamp(midpointMarginPercent, 0, 200) / 100.0
+
+        case .weighted_average:
+            let wHigh = clamp(weightedHighWeightPercent, 0, 100) / 100.0
+            let wLow = 1.0 - wHigh
+            base = (wLow * low) + (wHigh * high)
+            marginFraction = clamp(weightedMarginPercent, 0, 200) / 100.0
+        }
+
+        let withMargin = base * (1.0 + marginFraction)
+        return Int(ceil(withMargin))
     }
 
     public var estimatedSessionCost: Double {
-        Double(pricedSessionsHigh) * max(0, sessionRate)
+        Double(pricedSessionsForPricing) * max(0, sessionRate)
     }
 
     public var estimatedTravelCost: Double {
@@ -2906,85 +3284,100 @@ public final class ProgramEditorViewModel: ObservableObject {
     }
 }
 
-// @MainActor
-// public final class ProgramEditorViewModel: ObservableObject {
-//     @Published public var program: Program
-//     @Published public var selectedPackageID: Package.ID?
+public func clamp(_ v: Double, _ lo: Double, _ hi: Double) -> Double {
+    max(lo, min(hi, v))
+}
 
-//     // Swap UI state
-//     @Published public var swapTarget: SwapTarget?
+public extension ProgramEditorViewModel {
+    struct PricingDebug: Sendable, Hashable {
+        public let bandLow: Int
+        public let bandHigh: Int
 
-//     @Published public var estimateBand: ProgramTally.EstimateBand = .low_high
-//     @Published public var tallyPlacements: Set<ModuleComponentPlacement> = [.elementary]
+        public let baseSessions: Double
+        public let marginPercent: Double
+        public let marginFraction: Double
+        public let sessionsWithMarginDouble: Double
+        public let sessionsWithMarginCeiled: Int
 
-//     public struct SwapTarget: Identifiable {
-//         public let id: UUID = UUID()
-//         public let packageID: Package.ID
-//         public let moduleID: UUID
-//         public let entryID: UUID
-//         public let current: ModuleComponent
-//     }
+        public let sessionRate: Double
+        public let sessionCost: Double
 
-//     public init(program: Program = []) {
-//         self.program = program
-//         self.selectedPackageID = program.first?.id
-//     }
+        public let homeSessions: Int
+        public let travelDistanceKm: Double
+        public let travelRatePerKm: Double
+        public let travelCost: Double
 
-//     public var selectedPackageIndex: Int? {
-//         guard let id = selectedPackageID else { return nil }
-//         return program.firstIndex(where: { $0.id == id })
-//     }
+        public let totalCost: Double
+    }
 
-//     public func addTemplate(_ template: Package) {
-//         let instance = template.package() // NOTE: this currently regenerates id in your code. :contentReference[oaicite:1]{index=1}
-//         program.append(instance)
-//         selectedPackageID = instance.id
-//     }
+    private func makeDebug(strategy: PricingStrategy) -> PricingDebug {
+        let r = pricedSessionRangeRounded
+        let lo = Double(max(0, r.low))
+        let hi = Double(max(0, r.high))
 
-//     public func deletePackage(at offsets: IndexSet) {
-//         program.remove(atOffsets: offsets)
-//         if selectedPackageIndex == nil {
-//             selectedPackageID = program.first?.id
-//         }
-//     }
+        let base: Double
+        let marginPercent: Double
 
-//     public func movePackage(from: IndexSet, to: Int) {
-//         program.move(fromOffsets: from, toOffset: to)
-//     }
+        switch strategy {
+        case .midpoint:
+            base = (lo + hi) / 2.0
+            marginPercent = clamp(midpointMarginPercent, 0, 200)
 
-//     public func beginSwap(packageID: Package.ID, moduleID: UUID, entryID: UUID, current: ModuleComponent) {
-//         swapTarget = .init(packageID: packageID, moduleID: moduleID, entryID: entryID, current: current)
-//     }
+        case .weighted_average:
+            let wHigh = clamp(weightedHighWeightPercent, 0, 100) / 100.0
+            let wLow = 1.0 - wHigh
+            base = (wLow * lo) + (wHigh * hi)
+            marginPercent = clamp(weightedMarginPercent, 0, 200)
+        }
 
-//     public func commitSwap(newComponent: ModuleComponent) {
-//         guard let target = swapTarget else { return }
+        let marginFraction = marginPercent / 100.0
+        let withMargin = base * (1.0 + marginFraction)
+        let ceiled = Int(ceil(withMargin))
 
-//         guard let pIndex = program.firstIndex(where: { $0.id == target.packageID }) else { return }
-//         guard let mIndex = program[pIndex].modules.firstIndex(where: { $0.id == target.moduleID }) else { return }
-//         guard let eIndex = program[pIndex].modules[mIndex].entries.firstIndex(where: { $0.id == target.entryID }) else { return }
+        let rate = max(0, sessionRate)
+        let sessionCost = Double(ceiled) * rate
 
-//         program[pIndex].modules[mIndex].entries[eIndex].component = newComponent
-//         swapTarget = nil
-//     }
+        let hs = max(0, homeSessions)
+        let km = max(0, travelDistanceKm)
+        let kmRate = max(0, travelRatePerKm)
+        let travelCost = Double(hs) * km * kmRate
 
-//     // tallying
-//     public var sessionDuration: Int { 60 }
+        let total = sessionCost + travelCost
 
-//     public var totalSessions: SessionRange {
-//         ProgramTally.sessions(program: program, sessionDuration: sessionDuration)
-//     }
+        return PricingDebug(
+            bandLow: max(0, r.low),
+            bandHigh: max(0, r.high),
+            baseSessions: base,
+            marginPercent: marginPercent,
+            marginFraction: marginFraction,
+            sessionsWithMarginDouble: withMargin,
+            sessionsWithMarginCeiled: ceiled,
+            sessionRate: rate,
+            sessionCost: sessionCost,
+            homeSessions: hs,
+            travelDistanceKm: km,
+            travelRatePerKm: kmRate,
+            travelCost: travelCost,
+            totalCost: total
+        )
+    }
 
-//     public var totalMinutes: MinuteRange {
-//         ProgramTally.minutes(program: program)
-//     }
+    var pricingDebugWeighted: PricingDebug {
+        makeDebug(strategy: .weighted_average)
+    }
 
-//     public var totalSessionsLabel: String {
-//         let t = totalSessions
-//         if t.low == 0 && t.high == 0 { return "—" }
-//         if t.low == t.high { return "\(t.low)" }
-//         return "\(t.low)–\(t.high)"
-//     }
-// }
+    var pricingDebugMidpoint: PricingDebug {
+        makeDebug(strategy: .midpoint)
+    }
+
+    func formatMoney(_ value: Double) -> String {
+        Self.formatEUR(value)
+    }
+
+    func formatNumber2(_ value: Double) -> String {
+        String(format: "%.2f", value)
+    }
+}
 
 (!): 1 blank lines
 
@@ -3048,7 +3441,8 @@ public struct ProgramEditorView: View {
                                 sessionRate: vm.sessionRate,
                                 homeSessions: vm.homeSessions,
                                 travelDistanceKm: vm.travelDistanceKm,
-                                travelRatePerKm: vm.travelRatePerKm
+                                travelRatePerKm: vm.travelRatePerKm,
+                                includePriceInProgram: vm.includePriceInProgram,
                             )
                         )
 
@@ -3090,6 +3484,133 @@ public struct ProgramEditorView: View {
     }
 }
 
+private struct BandAnchorsHeader: View {
+    let band: ProgramTally.EstimateBand
+
+    var body: some View {
+        let excluded = band.excludedAnchor
+
+        HStack(spacing: 8) {
+            anchorBox(.low, excluded: excluded)
+            anchorBox(.medium, excluded: excluded)
+            anchorBox(.high, excluded: excluded)
+        }
+    }
+
+    @ViewBuilder
+    private func anchorBox(
+        _ a: ProgramTally.EstimateBand.Anchor,
+        excluded: ProgramTally.EstimateBand.Anchor
+    ) -> some View {
+        let isExcluded = (a == excluded)
+
+        Text(a.title)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(.primary.opacity(0.08), lineWidth: 1)
+            )
+            .opacity(isExcluded ? 0.25 : 1.0)
+    }
+}
+
+private struct PricingBreakdown: View {
+    @ObservedObject var vm: ProgramEditorViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Berekening")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 12) {
+                breakdownCard(
+                    title: "Weighted",
+                    isActive: vm.pricingStrategy == .weighted_average,
+                    debug: vm.pricingDebugWeighted,
+                    baseLine: {
+                        let wHigh = max(0, min(100, vm.weightedHighWeightPercent))
+                        let wLow = 100.0 - wHigh
+                        return "base = \(vm.formatNumber2(wLow / 100.0))×low + \(vm.formatNumber2(wHigh / 100.0))×high"
+                    }()
+                )
+
+                breakdownCard(
+                    title: "Midpoint",
+                    isActive: vm.pricingStrategy == .midpoint,
+                    debug: vm.pricingDebugMidpoint,
+                    baseLine: "base = (low + high) / 2"
+                )
+            }
+        }
+        .padding(12)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    @ViewBuilder
+    private func breakdownCard(
+        title: String,
+        isActive: Bool,
+        debug: ProgramEditorViewModel.PricingDebug,
+        baseLine: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.subheadline)
+                Spacer()
+                Text(isActive ? "actief" : "niet actief")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Group {
+                line("band", "\(debug.bandLow)–\(debug.bandHigh) sess")
+                line("base", "\(vm.formatNumber2(debug.baseSessions)) sess")
+                line("formule", baseLine)
+
+                line("marge", "\(vm.formatNumber2(debug.marginPercent))%")
+                line("met marge", "\(vm.formatNumber2(debug.sessionsWithMarginDouble)) sess")
+                line("ceil → sessies", "\(debug.sessionsWithMarginCeiled) sess")
+
+                Divider().padding(.vertical, 2)
+
+                line("sessiekosten",
+                     "\(debug.sessionsWithMarginCeiled) × \(vm.formatMoney(debug.sessionRate)) = \(vm.formatMoney(debug.sessionCost))")
+
+                line("reis",
+                     "\(debug.homeSessions) × \(vm.formatNumber2(debug.travelDistanceKm)) km × \(vm.formatMoney(debug.travelRatePerKm)) = \(vm.formatMoney(debug.travelCost))")
+
+                line("totaal",
+                     "\(vm.formatMoney(debug.sessionCost)) + \(vm.formatMoney(debug.travelCost)) = \(vm.formatMoney(debug.totalCost))")
+            }
+            .font(.caption)
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .opacity(isActive ? 1.0 : 0.55)
+    }
+
+    @ViewBuilder
+    private func line(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(label)
+                .frame(width: 90, alignment: .leading)
+            Text(value)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
 public struct PackageListView: View {
     @ObservedObject public var vm: ProgramEditorViewModel
 
@@ -3114,18 +3635,33 @@ public struct PackageListView: View {
                             .monospacedDigit()
                     }
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        Picker("Band", selection: $vm.estimateBand) {
-                            Text("Low–High").tag(ProgramTally.EstimateBand.low_high)
-                            Text("Low–Medium").tag(ProgramTally.EstimateBand.low_medium)
-                            Text("Medium–High").tag(ProgramTally.EstimateBand.medium_high)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        BandAnchorsHeader(band: vm.estimateBand)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            // Picker("Band", selection: $vm.estimateBand) {
+                            //     Text("Low–High").tag(ProgramTally.EstimateBand.low_high)
+                            //     Text("Low–Medium").tag(ProgramTally.EstimateBand.low_medium)
+                            //     Text("Medium–High").tag(ProgramTally.EstimateBand.medium_high)
+                            // }
+                            Picker("Band", selection: $vm.estimateBand) {
+                                Text(ProgramTally.EstimateBand.low_medium.field_label_range_visual)
+                                    .tag(ProgramTally.EstimateBand.low_medium)
+
+                                Text(ProgramTally.EstimateBand.low_high.field_label_range_visual)
+                                    .tag(ProgramTally.EstimateBand.low_high)
+
+                                Text(ProgramTally.EstimateBand.medium_high.field_label_range_visual)
+                                    .tag(ProgramTally.EstimateBand.medium_high)
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .fixedSize(horizontal: true, vertical: false)
+                            .padding(.horizontal, 2)
                         }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .fixedSize(horizontal: true, vertical: false)
-                        .padding(.horizontal, 2)
+                        .scrollClipDisabled()
                     }
-                    .scrollClipDisabled()
 
                     MultiSelectList(
                         title: "Tally",
@@ -3145,69 +3681,229 @@ public struct PackageListView: View {
 
             Section("Prijs") {
                 VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Text("Sessie-tarief")
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        TextField("", value: $vm.sessionRate, format: .number.precision(.fractionLength(2)))
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 110)
-                    }
 
-                    HStack {
-                        Text("Thuis-sessies")
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        TextField("", value: $vm.homeSessions, format: .number)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 110)
-                    }
+                    // Toggle row (same visual language as MultiSelectList rows)
+                    Button {
+                        vm.includePriceInProgram.toggle()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: vm.includePriceInProgram ? "checkmark.circle.fill" : "circle")
+                                .imageScale(.medium)
 
-                    HStack {
-                        Text("Reisafstand (km)")
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        TextField("", value: $vm.travelDistanceKm, format: .number.precision(.fractionLength(1)))
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 110)
+                            Text("Prijs opnemen in programma")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .contentShape(Rectangle())
                     }
-
-                    HStack {
-                        Text("Tarief per km")
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        TextField("", value: $vm.travelRatePerKm, format: .number.precision(.fractionLength(2)))
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 110)
-                    }
+                    .buttonStyle(.plain)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
 
                     Divider()
                         .padding(.vertical, 2)
 
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("Schatting (band high)")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text("Sessie-tarief")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            TextField("", value: $vm.sessionRate, format: .number.precision(.fractionLength(2)))
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 110)
+                        }
 
-                        Spacer()
+                        HStack {
+                            Text("Thuis-sessies")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            TextField("", value: $vm.homeSessions, format: .number)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 110)
+                        }
 
-                        Text(vm.estimatedTotalCostLabel)
-                            .font(.subheadline)
-                            .monospacedDigit()
+                        HStack {
+                            Text("Reisafstand (km)")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            TextField("", value: $vm.travelDistanceKm, format: .number.precision(.fractionLength(1)))
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 110)
+                        }
+
+                        HStack {
+                            Text("Tarief per km")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            TextField("", value: $vm.travelRatePerKm, format: .number.precision(.fractionLength(2)))
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 110)
+                        }
+
+                        Divider()
+                            .padding(.vertical, 2)
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Prijsstrategie")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                Picker("Prijsstrategie", selection: $vm.pricingStrategy) {
+                                    Text(PricingStrategy.weighted_average.title)
+                                        .tag(PricingStrategy.weighted_average)
+
+                                    Text(PricingStrategy.midpoint.title)
+                                        .tag(PricingStrategy.midpoint)
+                                }
+                                .pickerStyle(.segmented)
+                                .labelsHidden()
+                                .fixedSize(horizontal: true, vertical: false)
+                                .padding(.horizontal, 2)
+                            }
+                            .scrollClipDisabled()
+
+                            // Weighted settings (visible, disabled when not selected)
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack {
+                                    Text("high weight (%)")
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    TextField(
+                                        "",
+                                        value: $vm.weightedHighWeightPercent,
+                                        format: .number.precision(.fractionLength(0))
+                                    )
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 110)
+                                }
+
+                                HStack {
+                                    Text("marge (%)")
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    TextField(
+                                        "",
+                                        value: $vm.weightedMarginPercent,
+                                        format: .number.precision(.fractionLength(0))
+                                    )
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 110)
+                                }
+                            }
+                            .disabled(vm.pricingStrategy != .weighted_average)
+                            .opacity(vm.pricingStrategy == .weighted_average ? 1.0 : 0.45)
+
+                            // Midpoint settings (visible, disabled when not selected)
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack {
+                                    Text("marge (%)")
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    TextField(
+                                        "",
+                                        value: $vm.midpointMarginPercent,
+                                        format: .number.precision(.fractionLength(0))
+                                    )
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 110)
+                                }
+                            }
+                            .disabled(vm.pricingStrategy != .midpoint)
+                            .opacity(vm.pricingStrategy == .midpoint ? 1.0 : 0.45)
+                        }
+
+                        PricingBreakdown(vm: vm)
+
+                        Divider()
+                            .padding(.vertical, 2)
+
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("Schatting (prijs)")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+
+                            Spacer()
+
+                            Text(vm.estimatedTotalCostLabel)
+                                .font(.subheadline)
+                                .monospacedDigit()
+                        }
                     }
+                    .disabled(!vm.includePriceInProgram)
+                    .opacity(vm.includePriceInProgram ? 1.0 : 0.45)
                 }
                 .padding(.vertical, 4)
                 .padding(.trailing, 6)
             }
 
-            Section("Pakketten") {
+            // Section("Prijs") {
+            //     VStack(alignment: .leading, spacing: 10) {
+            //         HStack {
+            //             Text("Sessie-tarief")
+            //                 .foregroundStyle(.secondary)
+            //             Spacer()
+            //             TextField("", value: $vm.sessionRate, format: .number.precision(.fractionLength(2)))
+            //                 .multilineTextAlignment(.trailing)
+            //                 .frame(width: 110)
+            //         }
+
+            //         HStack {
+            //             Text("Thuis-sessies")
+            //                 .foregroundStyle(.secondary)
+            //             Spacer()
+            //             TextField("", value: $vm.homeSessions, format: .number)
+            //                 .multilineTextAlignment(.trailing)
+            //                 .frame(width: 110)
+            //         }
+
+            //         HStack {
+            //             Text("Reisafstand (km)")
+            //                 .foregroundStyle(.secondary)
+            //             Spacer()
+            //             TextField("", value: $vm.travelDistanceKm, format: .number.precision(.fractionLength(1)))
+            //                 .multilineTextAlignment(.trailing)
+            //                 .frame(width: 110)
+            //         }
+
+            //         HStack {
+            //             Text("Tarief per km")
+            //                 .foregroundStyle(.secondary)
+            //             Spacer()
+            //             TextField("", value: $vm.travelRatePerKm, format: .number.precision(.fractionLength(2)))
+            //                 .multilineTextAlignment(.trailing)
+            //                 .frame(width: 110)
+            //         }
+
+            //         Divider()
+            //             .padding(.vertical, 2)
+
+            //         HStack(alignment: .firstTextBaseline) {
+            //             Text("Schatting (band high)")
+            //                 .font(.subheadline)
+            //                 .foregroundStyle(.secondary)
+
+            //             Spacer()
+
+            //             Text(vm.estimatedTotalCostLabel)
+            //                 .font(.subheadline)
+            //                 .monospacedDigit()
+            //         }
+            //     }
+            //     .padding(.vertical, 4)
+            //     .padding(.trailing, 6)
+            // }
+
+            Section("Pakketsamenstelling") {
                 ForEach(vm.program) { pkg in
                     PackageRow(
                         title: pkg.title,
                         canMoveUp: canMovePackageUp(pkgID: pkg.id),
                         canMoveDown: canMovePackageDown(pkgID: pkg.id),
                         onMoveUp: { movePackageUp(pkgID: pkg.id) },
-                        onMoveDown: { movePackageDown(pkgID: pkg.id) }
+                        onMoveDown: { movePackageDown(pkgID: pkg.id) },
+                        onDelete: { deletePackageByID(pkg.id) }
                     )
                     .tag(pkg.id)
                     .contextMenu {
@@ -3325,22 +4021,62 @@ private struct PackageRow: View {
     public let canMoveDown: Bool
     public let onMoveUp: () -> Void
     public let onMoveDown: () -> Void
+    public let onDelete: () -> Void
 
     public var body: some View {
         HStack(spacing: 8) {
             Text(title)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            Button("↑") { onMoveUp() }
-                .buttonStyle(.plain)
-                .disabled(!canMoveUp)
+            Button {
+                onMoveUp()
+            } label: {
+                Text("↑")
+            }
+            .buttonStyle(.plain)
+            .disabled(!canMoveUp)
 
-            Button("↓") { onMoveDown() }
-                .buttonStyle(.plain)
-                .disabled(!canMoveDown)
+            Button {
+                onMoveDown()
+            } label: {
+                Text("↓")
+            }
+            .buttonStyle(.plain)
+            .disabled(!canMoveDown)
+
+            Button(role: .destructive) {
+                onDelete()
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.plain)
+            .help("Verwijder pakket")
         }
     }
 }
+
+// private struct PackageRow: View {
+//     public let title: String
+//     public let canMoveUp: Bool
+//     public let canMoveDown: Bool
+//     public let onMoveUp: () -> Void
+//     public let onMoveDown: () -> Void
+
+//     public var body: some View {
+//         HStack(spacing: 8) {
+//             Text(title)
+//                 .frame(maxWidth: .infinity, alignment: .leading)
+
+//             Button("↑") { onMoveUp() }
+//                 .buttonStyle(.plain)
+//                 .disabled(!canMoveUp)
+
+//             Button("↓") { onMoveDown() }
+//                 .buttonStyle(.plain)
+//                 .disabled(!canMoveDown)
+//         }
+//     }
+// }
 
 @MainActor
 public extension ProgramEditorViewModel {

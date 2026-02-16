@@ -20,6 +20,8 @@ public enum ProgramExport {
         public var travelDistanceKm: Double
         public var travelRatePerKm: Double
 
+        public var includePriceInProgram: Bool
+
         public init(
             output: String = "",
             title: String = "Pakketsamenstelling",
@@ -32,7 +34,8 @@ public enum ProgramExport {
             sessionRate: Double = 300,
             homeSessions: Int = 0,
             travelDistanceKm: Double = 0,
-            travelRatePerKm: Double = 2.50
+            travelRatePerKm: Double = 2.50,
+            includePriceInProgram: Bool = true,
         ) {
             self.output = output
             self.title = title
@@ -46,6 +49,7 @@ public enum ProgramExport {
             self.homeSessions = homeSessions
             self.travelDistanceKm = travelDistanceKm
             self.travelRatePerKm = travelRatePerKm
+            self.includePriceInProgram = includePriceInProgram
         }
     }
 
@@ -148,6 +152,7 @@ public enum ProgramExport {
         let totalPrice = sessionCost + travelCost
 
         let priceLabel: String? = {
+            guard request.includePriceInProgram else { return nil }
             if pricedSessionsHigh == 0 && request.homeSessions == 0 { return nil }
             return formatEUR(totalPrice)
         }()
@@ -158,7 +163,9 @@ public enum ProgramExport {
             dogName: dogName,
             estimatedSessions: estimatedSessions,
             includedPackages: includedPackages,
-            priceLabel: priceLabel
+            priceLabel: priceLabel,
+            // adding for dot spread
+            estimateBand: request.estimateBand
         )
     }
 
