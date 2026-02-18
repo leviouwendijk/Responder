@@ -1,5 +1,9 @@
 import SwiftUI
 
+import Implementations
+@preconcurrency import Contacts
+import Compositions
+
 public enum ViewVariables {
     static let program_caption_size: CGFloat = 12
 }
@@ -7,11 +11,23 @@ public enum ViewVariables {
 public struct ProgramEditorView: View {
     @StateObject private var vm = ProgramEditorViewModel(program: [
         PrebuiltPackage.startersvaardigheden,
-        PrebuiltPackage.hervorming(target: .angst)
+        // PrebuiltPackage.hervorming(target: .angst)
     ])
 
     @State private var exportError: String?
     @State private var exportResultPath: String?
+
+    // Contacts (isolated for now; later can be swapped for shared context)
+    @StateObject private var contactsVm = ContactsListViewModel()
+    @State private var selectedContact: CNContact?
+    @State private var showContactPicker = false
+
+    // Identity (isolated for now; later can be swapped for shared context)
+    @State private var clientName: String = ""
+    @State private var dogName: String = ""
+
+    // Dog name editing is in this view (subtle; no new sidebar sections)
+    @State private var showDogNameEditor = false
 
     public init() {}
 
@@ -26,7 +42,10 @@ public struct ProgramEditorView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                contactToolbarItems()
+                dogToolbarItems()
+
                 Button("Export") {
                     do {
                         // let dest = try ProgramExport.export(
@@ -60,6 +79,10 @@ public struct ProgramEditorView: View {
                                 midpointMarginPercent: vm.midpointMarginPercent,
                                 weightedHighWeightPercent: vm.weightedHighWeightPercent,
                                 weightedMarginPercent: vm.weightedMarginPercent,
+
+                                // identity (still isolated in Program tab for now)
+                                clientName: effectiveClientName(),
+                                dogName: effectiveDogName()
                             )
                         )
 
@@ -98,6 +121,242 @@ public struct ProgramEditorView: View {
                 }
             )
         }
+        .sheet(isPresented: $showContactPicker) {
+            contactPickerSheet()
+        }
+        .sheet(isPresented: $showDogNameEditor) {
+            dogNameEditorSheet()
+        }
+    }
+
+    // Contacts UI (isolated; later can read/write shared selection state)
+
+    @ViewBuilder
+    private func contactToolbarItems() -> some View {
+        Button {
+            showContactPicker = true
+        } label: {
+            Image(systemName: selectedContact == nil ? "person" : "person.fill")
+        }
+        .help(selectedContact == nil ? "Selecteer contact" : "Wijzig contact")
+
+        if selectedContact != nil {
+            Button {
+                clearSelectedContact()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .imageScale(.medium)
+            }
+            .buttonStyle(.plain)
+            .help("Wis contact")
+        }
+    }
+
+    private func contactPickerSheet() -> some View {
+        NavigationStack {
+            ContactsListView(
+                viewmodel: contactsVm,
+                maxListHeight: 520,
+                onSelect: { contact in
+                    applySelectedContact(contact)
+                    showContactPicker = false
+                },
+                onDeselect: {
+                    clearSelectedContact()
+                },
+                autoScrollToTop: true,
+                hideSearchStrictness: false
+            )
+            .navigationTitle("Selecteer contact")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Sluit") {
+                        showContactPicker = false
+                    }
+                }
+
+                if selectedContact != nil {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Wis") {
+                            clearSelectedContact()
+                        }
+                    }
+                }
+            }
+            .frame(minWidth: 640, minHeight: 640)
+        }
+    }
+
+    // Dog UI (subtle: a single button; actual editing happens in a sheet)
+
+    @ViewBuilder
+    private func dogToolbarItems() -> some View {
+        Button {
+            showDogNameEditor = true
+        } label: {
+            Image(systemName: effectiveDogName().isEmpty || effectiveDogName() == "—" ? "pawprint" : "pawprint.fill")
+        }
+        .help(effectiveDogName().isEmpty || effectiveDogName() == "—" ? "Zet hondnaam" : "Wijzig hondnaam")
+
+        if !(dogName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+            Button {
+                dogName = ""
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .imageScale(.medium)
+            }
+            .buttonStyle(.plain)
+            .help("Wis hondnaam")
+        }
+    }
+
+    private func dogNameEditorSheet() -> some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Hond")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    TextField("Hondnaam", text: $dogName)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                Text("dev note: dit is los van Contacts. Later kunnen we dit koppelen aan gedeelde state.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .navigationTitle("Hondnaam")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Sluit") {
+                        showDogNameEditor = false
+                    }
+                }
+
+                if !(dogName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Wis") {
+                            dogName = ""
+                        }
+                    }
+                }
+            }
+            .frame(minWidth: 420, minHeight: 220)
+        }
+    }
+
+    // Selection → identity mapping (still isolated here)
+
+//     private func applySelectedContact(_ contact: CNContact) {
+//         selectedContact = contact
+
+//         let display = contactDisplayName(contact)
+//         if !display.isEmpty {
+//             clientName = display
+//         } else {
+//             clientName = ""
+//         }
+//     }
+
+    private func applySelectedContact(_ contact: CNContact) {
+        selectedContact = contact
+
+        let parsed = parseContactIdentity(contact)
+
+        clientName = parsed.client
+        dogName = parsed.dog ?? ""
+    }
+
+    private func clearSelectedContact() {
+        selectedContact = nil
+        clientName = ""
+        dogName = ""
+    }
+
+    private func contactDisplayName(_ c: CNContact) -> String {
+        let parsed = parseContactIdentity(c)
+        return parsed.client.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "—" : parsed.client
+    }
+
+    // private func contactDisplayName(_ c: CNContact) -> String {
+    //     let g = c.givenName.trimmingCharacters(in: .whitespacesAndNewlines)
+    //     let f = c.familyName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    //     let name = [g, f].filter { !$0.isEmpty }.joined(separator: " ")
+    //     if !name.isEmpty { return name }
+
+    //     if let email = c.emailAddresses.first?.value as String?, !email.isEmpty {
+    //         return email
+    //     }
+
+    //     return ""
+    // }
+
+    private func effectiveClientName() -> String {
+        let s = clientName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return s.isEmpty ? "—" : s
+    }
+
+    private func effectiveDogName() -> String {
+        let s = dogName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return s.isEmpty ? "—" : s
+    }
+
+    // SPLITTING HELPERS FOR NOW
+    private func parseContactIdentity(_ c: CNContact) -> (client: String, dog: String?) {
+        let given = c.givenName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let family = c.familyName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Your convention: "<PERSON> | <DOG>" stored in givenName
+        if let (left, right) = splitPipe(given) {
+            let client = joinName(left, family)
+            let dog = right.trimmingCharacters(in: .whitespacesAndNewlines)
+            return (client: client.isEmpty ? fallbackClientName(c) : client,
+                    dog: dog.isEmpty ? nil : dog)
+        }
+
+        // No pipe: normal contact name, and dog is unknown (defaults to "—" via effectiveDogName()).
+        let client = fallbackClientName(c)
+        return (client: client, dog: nil)
+    }
+
+    private func splitPipe(_ s: String) -> (left: String, right: String)? {
+        // Only accept if we have a non-empty left side.
+        let parts = s.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+        guard parts.count == 2 else { return nil }
+
+        let left = String(parts[0]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let right = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !left.isEmpty else { return nil }
+        return (left, right)
+    }
+
+    private func joinName(_ given: String, _ family: String) -> String {
+        if family.isEmpty { return given }
+        if given.isEmpty { return family }
+        return "\(given) \(family)"
+    }
+
+    private func fallbackClientName(_ c: CNContact) -> String {
+        let given = c.givenName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let family = c.familyName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let full = joinName(given, family).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !full.isEmpty { return full }
+
+        // Optional: email fallback if you want it
+        if let email = c.emailAddresses.first?.value as String? {
+            let e = email.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !e.isEmpty { return e }
+        }
+
+        return "—"
     }
 }
 

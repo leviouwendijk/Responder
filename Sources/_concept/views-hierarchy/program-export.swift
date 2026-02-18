@@ -27,6 +27,10 @@ public enum ProgramExport {
         public var weightedHighWeightPercent: Double
         public var weightedMarginPercent: Double
 
+        // Identity (optional; used for DocDataBox)
+        public var clientName: String
+        public var dogName: String
+
         public init(
             output: String = "",
             title: String = "Pakketsamenstelling",
@@ -44,7 +48,10 @@ public enum ProgramExport {
             pricingStrategy: PricingStrategy = .weighted_average,
             midpointMarginPercent: Double = 15,
             weightedHighWeightPercent: Double = 65,
-            weightedMarginPercent: Double = 0
+            weightedMarginPercent: Double = 0,
+            // Identity (optional; used for DocDataBox)
+            clientName: String = "—",
+            dogName: String = "—"
         ) {
             self.output = output
             self.title = title
@@ -63,6 +70,8 @@ public enum ProgramExport {
             self.midpointMarginPercent = midpointMarginPercent
             self.weightedHighWeightPercent = weightedHighWeightPercent
             self.weightedMarginPercent = weightedMarginPercent
+            self.clientName = clientName
+            self.dogName = dogName
         }
     }
 
@@ -126,9 +135,10 @@ public enum ProgramExport {
     }
 
     private static func makeOverview(program: [Package], request: Request) -> DocDataBox {
-        // Placeholders for now (you said hardcode)
-        let clientName = "—"
-        let dogName = "—"
+        // let clientName = "—"
+        // let dogName = "—"
+        let clientName = request.clientName
+        let dogName = request.dogName
 
         let dateLabel: String = {
             let f = DateFormatter()

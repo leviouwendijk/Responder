@@ -1436,6 +1436,10 @@ public enum ProgramExport {
         public var weightedHighWeightPercent: Double
         public var weightedMarginPercent: Double
 
+        // Identity (optional; used for DocDataBox)
+        public var clientName: String
+        public var dogName: String
+
         public init(
             output: String = "",
             title: String = "Pakketsamenstelling",
@@ -1453,7 +1457,10 @@ public enum ProgramExport {
             pricingStrategy: PricingStrategy = .weighted_average,
             midpointMarginPercent: Double = 15,
             weightedHighWeightPercent: Double = 65,
-            weightedMarginPercent: Double = 0
+            weightedMarginPercent: Double = 0,
+            // Identity (optional; used for DocDataBox)
+            clientName: String = "—",
+            dogName: String = "—"
         ) {
             self.output = output
             self.title = title
@@ -1472,6 +1479,8 @@ public enum ProgramExport {
             self.midpointMarginPercent = midpointMarginPercent
             self.weightedHighWeightPercent = weightedHighWeightPercent
             self.weightedMarginPercent = weightedMarginPercent
+            self.clientName = clientName
+            self.dogName = dogName
         }
     }
 
@@ -1535,9 +1544,10 @@ public enum ProgramExport {
     }
 
     private static func makeOverview(program: [Package], request: Request) -> DocDataBox {
-        // Placeholders for now (you said hardcode)
-        let clientName = "—"
-        let dogName = "—"
+        // let clientName = "—"
+        // let dogName = "—"
+        let clientName = request.clientName
+        let dogName = request.dogName
 
         let dateLabel: String = {
             let f = DateFormatter()
@@ -2016,25 +2026,44 @@ public struct DocDataBox: Sendable {
             docDataLine(label: "Hond:", value: dogName),
         ]
 
-        if let sessions = estimatedSessions {
+        let sessionsLabel: String? = estimatedSessions.map { sessions in
+            "\(sessions.low)–\(sessions.high)"
+        }
+
+        let spreadLabel: String? = estimateBand.map { band in
+            band.dotString(filled: band.dot_spread_count)
+        }
+
+        let sessionsLabelWithSpread: String? = {
+            guard let sessionsLabel else { return nil }
+
+            guard let spreadLabel, !spreadLabel.isEmpty else {
+                return sessionsLabel
+            }
+
+            return "\(sessionsLabel)"
+            // return "\(sessionsLabel) (\(spreadLabel))"
+        }()
+
+        if let sessionsLabelWithSpread {
             contentNodes.append(
                 docDataLine(
                     label: "Sessies:",
-                    value: "\(sessions.low)–\(sessions.high)"
+                    value: sessionsLabelWithSpread
                 )
             )
         }
 
-        if let band = estimateBand {
-            let dots = band.dotString(filled: band.dot_spread_count)
-            contentNodes.append(
-                docDataLine(
-                    label: "Programma-spreiding:",
-                    // value: "\(dots)  \(band.publicDetails)"
-                    value: "\(dots)"
-                )
-            )
-        }
+        // NOTE: removed the separate Programma-spreiding line
+        // if let band = estimateBand {
+        //     let dots = band.dotString(filled: band.dot_spread_count)
+        //     contentNodes.append(
+        //         docDataLine(
+        //             label: "Programma-spreiding:",
+        //             value: "\(dots)"
+        //         )
+        //     )
+        // }
 
         if let packages = includedPackages, !packages.isEmpty {
             let titleLabel = "Pakketsamenstelling:"
@@ -2154,9 +2183,9 @@ public enum ProgramHTML {
     }
 
     private static func renderProgramBanner(band: ProgramTally.EstimateBand?) -> any HTMLNode {
-        // let dots: String? = band.map { b in
-        //     b.dotString(filled: b.dot_spread_count)
-        // }
+        let dots: String? = band.map { b in
+            b.dotString(filled: b.dot_spread_count)
+        }
 
         return HTML.div(["class": "ph-program-banner__inner"]) {
             HTML.div(["class": "ph-program-banner__top"]) {
@@ -2166,16 +2195,16 @@ public enum ProgramHTML {
                     HTML.text("Over dit programma")
                 }
 
-                // if let dots {
-                //     HTML.div(["class": "ph-program-banner__dots"]) {
-                //         // HTML.span(["class": "ph-program-banner__dots-label"]) {
-                //         //     HTML.text("spreiding")
-                //         // }
-                //         HTML.span(["class": "ph-program-banner__dots-value"]) {
-                //             HTML.text(dots)
-                //         }
-                //     }
-                // }
+                if let dots {
+                    HTML.div(["class": "ph-program-banner__dots"]) {
+                        // HTML.span(["class": "ph-program-banner__dots-label"]) {
+                        //     HTML.text("spreiding")
+                        // }
+                        HTML.span(["class": "ph-program-banner__dots-value"]) {
+                            HTML.text(dots)
+                        }
+                    }
+                }
             }
 
             HTML.p(["class": "ph-program-banner__body"]) {
@@ -3812,6 +3841,10 @@ public extension ProgramEditorViewModel {
 +------------------------------------------------------+
 import SwiftUI
 
+import Implementations
+@preconcurrency import Contacts
+import Compositions
+
 public enum ViewVariables {
     static let program_caption_size: CGFloat = 12
 }
@@ -3819,11 +3852,23 @@ public enum ViewVariables {
 public struct ProgramEditorView: View {
     @StateObject private var vm = ProgramEditorViewModel(program: [
         PrebuiltPackage.startersvaardigheden,
-        PrebuiltPackage.hervorming(target: .angst)
+        // PrebuiltPackage.hervorming(target: .angst)
     ])
 
     @State private var exportError: String?
     @State private var exportResultPath: String?
+
+    // Contacts (isolated for now; later can be swapped for shared context)
+    @StateObject private var contactsVm = ContactsListViewModel()
+    @State private var selectedContact: CNContact?
+    @State private var showContactPicker = false
+
+    // Identity (isolated for now; later can be swapped for shared context)
+    @State private var clientName: String = ""
+    @State private var dogName: String = ""
+
+    // Dog name editing is in this view (subtle; no new sidebar sections)
+    @State private var showDogNameEditor = false
 
     public init() {}
 
@@ -3838,7 +3883,10 @@ public struct ProgramEditorView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                contactToolbarItems()
+                dogToolbarItems()
+
                 Button("Export") {
                     do {
                         // let dest = try ProgramExport.export(
@@ -3872,6 +3920,10 @@ public struct ProgramEditorView: View {
                                 midpointMarginPercent: vm.midpointMarginPercent,
                                 weightedHighWeightPercent: vm.weightedHighWeightPercent,
                                 weightedMarginPercent: vm.weightedMarginPercent,
+
+                                // identity (still isolated in Program tab for now)
+                                clientName: effectiveClientName(),
+                                dogName: effectiveDogName()
                             )
                         )
 
@@ -3910,6 +3962,174 @@ public struct ProgramEditorView: View {
                 }
             )
         }
+        .sheet(isPresented: $showContactPicker) {
+            contactPickerSheet()
+        }
+        .sheet(isPresented: $showDogNameEditor) {
+            dogNameEditorSheet()
+        }
+    }
+
+    // Contacts UI (isolated; later can read/write shared selection state)
+
+    @ViewBuilder
+    private func contactToolbarItems() -> some View {
+        Button {
+            showContactPicker = true
+        } label: {
+            Image(systemName: selectedContact == nil ? "person" : "person.fill")
+        }
+        .help(selectedContact == nil ? "Selecteer contact" : "Wijzig contact")
+
+        if selectedContact != nil {
+            Button {
+                clearSelectedContact()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .imageScale(.medium)
+            }
+            .buttonStyle(.plain)
+            .help("Wis contact")
+        }
+    }
+
+    private func contactPickerSheet() -> some View {
+        NavigationStack {
+            ContactsListView(
+                viewmodel: contactsVm,
+                maxListHeight: 520,
+                onSelect: { contact in
+                    applySelectedContact(contact)
+                    showContactPicker = false
+                },
+                onDeselect: {
+                    clearSelectedContact()
+                },
+                autoScrollToTop: true,
+                hideSearchStrictness: false
+            )
+            .navigationTitle("Selecteer contact")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Sluit") {
+                        showContactPicker = false
+                    }
+                }
+
+                if selectedContact != nil {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Wis") {
+                            clearSelectedContact()
+                        }
+                    }
+                }
+            }
+            .frame(minWidth: 640, minHeight: 640)
+        }
+    }
+
+    // Dog UI (subtle: a single button; actual editing happens in a sheet)
+
+    @ViewBuilder
+    private func dogToolbarItems() -> some View {
+        Button {
+            showDogNameEditor = true
+        } label: {
+            Image(systemName: effectiveDogName().isEmpty || effectiveDogName() == "—" ? "pawprint" : "pawprint.fill")
+        }
+        .help(effectiveDogName().isEmpty || effectiveDogName() == "—" ? "Zet hondnaam" : "Wijzig hondnaam")
+
+        if !(dogName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+            Button {
+                dogName = ""
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .imageScale(.medium)
+            }
+            .buttonStyle(.plain)
+            .help("Wis hondnaam")
+        }
+    }
+
+    private func dogNameEditorSheet() -> some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Hond")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    TextField("Hondnaam", text: $dogName)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                Text("dev note: dit is los van Contacts. Later kunnen we dit koppelen aan gedeelde state.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .navigationTitle("Hondnaam")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Sluit") {
+                        showDogNameEditor = false
+                    }
+                }
+
+                if !(dogName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Wis") {
+                            dogName = ""
+                        }
+                    }
+                }
+            }
+            .frame(minWidth: 420, minHeight: 220)
+        }
+    }
+
+    // Selection → identity mapping (still isolated here)
+
+    private func applySelectedContact(_ contact: CNContact) {
+        selectedContact = contact
+
+        let display = contactDisplayName(contact)
+        if !display.isEmpty {
+            clientName = display
+        } else {
+            clientName = ""
+        }
+    }
+
+    private func clearSelectedContact() {
+        selectedContact = nil
+        clientName = ""
+    }
+
+    private func contactDisplayName(_ c: CNContact) -> String {
+        let g = c.givenName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let f = c.familyName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let name = [g, f].filter { !$0.isEmpty }.joined(separator: " ")
+        if !name.isEmpty { return name }
+
+        if let email = c.emailAddresses.first?.value as String?, !email.isEmpty {
+            return email
+        }
+
+        return ""
+    }
+
+    private func effectiveClientName() -> String {
+        let s = clientName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return s.isEmpty ? "—" : s
+    }
+
+    private func effectiveDogName() -> String {
+        let s = dogName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return s.isEmpty ? "—" : s
     }
 }
 

@@ -4,6 +4,7 @@
 [Directories]
 # Add directories, e.g. Sources/
 _concept
+# Sources
 
 [Files]
 # Add specific file paths, e.g. README.md
