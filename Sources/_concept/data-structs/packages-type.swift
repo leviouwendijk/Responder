@@ -42,6 +42,7 @@ public enum PrebuiltPackage {
     public static let startersvaardigheden: Package = .init(
         title: "Startersvaardigheden",
         modules: [
+            PrebuiltModules.preparation(),
             PrebuiltModules.communication(),
             PrebuiltModules.motivation(),
             PrebuiltModules.engagement()

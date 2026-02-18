@@ -576,6 +576,7 @@ public enum PrebuiltPackage {
     public static let startersvaardigheden: Package = .init(
         title: "Startersvaardigheden",
         modules: [
+            PrebuiltModules.preparation(),
             PrebuiltModules.communication(),
             PrebuiltModules.motivation(),
             PrebuiltModules.engagement()
@@ -1430,6 +1431,11 @@ public enum ProgramExport {
 
         public var includePriceInProgram: Bool
 
+        public var pricingStrategy: PricingStrategy
+        public var midpointMarginPercent: Double
+        public var weightedHighWeightPercent: Double
+        public var weightedMarginPercent: Double
+
         public init(
             output: String = "",
             title: String = "Pakketsamenstelling",
@@ -1444,6 +1450,10 @@ public enum ProgramExport {
             travelDistanceKm: Double = 0,
             travelRatePerKm: Double = 2.50,
             includePriceInProgram: Bool = true,
+            pricingStrategy: PricingStrategy = .weighted_average,
+            midpointMarginPercent: Double = 15,
+            weightedHighWeightPercent: Double = 65,
+            weightedMarginPercent: Double = 0
         ) {
             self.output = output
             self.title = title
@@ -1458,6 +1468,10 @@ public enum ProgramExport {
             self.travelDistanceKm = travelDistanceKm
             self.travelRatePerKm = travelRatePerKm
             self.includePriceInProgram = includePriceInProgram
+            self.pricingStrategy = pricingStrategy
+            self.midpointMarginPercent = midpointMarginPercent
+            self.weightedHighWeightPercent = weightedHighWeightPercent
+            self.weightedMarginPercent = weightedMarginPercent
         }
     }
 
@@ -1547,22 +1561,34 @@ public enum ProgramExport {
 
         let includedPackages = program.map(\.title)
 
-        // Pricing:
-        // - session tally uses the estimate band HIGH
-        // - plus travel: homeSessions * travelDistanceKm * travelRatePerKm
-        let pricedSessionsHigh = sessions.rounded.high
-        let sessionCost = Double(pricedSessionsHigh) * max(0, request.sessionRate)
+        // Pricing (ProgramPricer):
+        // - derives base sessions from band low/high using pricingStrategy
+        // - ceils base sessions for pricing
+        // - adds travel cost
+        // - applies margin as a price markup on subtotal
 
-        let travelCost = Double(max(0, request.homeSessions))
-            * max(0, request.travelDistanceKm)
-            * max(0, request.travelRatePerKm)
+        // let rounded = sessions.rounded
 
-        let totalPrice = sessionCost + travelCost
+        let priced = ProgramPricer.compute(
+            .init(
+                bandLow: max(0, sessions.low),
+                bandHigh: max(0, sessions.high),
+                pricingStrategy: request.pricingStrategy,
+                midpointMarginPercent: request.midpointMarginPercent,
+                weightedHighWeightPercent: request.weightedHighWeightPercent,
+                weightedMarginPercent: request.weightedMarginPercent,
+                sessionRate: request.sessionRate,
+                homeSessions: request.homeSessions,
+                travelDistanceKm: request.travelDistanceKm,
+                travelRatePerKm: request.travelRatePerKm
+            )
+        )
 
         let priceLabel: String? = {
             guard request.includePriceInProgram else { return nil }
-            if pricedSessionsHigh == 0 && request.homeSessions == 0 { return nil }
-            return formatEUR(totalPrice)
+            if priced.sessionsCeiled == 0 && priced.homeSessions == 0 { return nil }
+            // return formatEUR(priced.totalCost)
+            return formatEUR(priced.totalCostRounded)
         }()
 
         return DocDataBox(
@@ -2128,32 +2154,68 @@ public enum ProgramHTML {
     }
 
     private static func renderProgramBanner(band: ProgramTally.EstimateBand?) -> any HTMLNode {
-        let marker = band?.publicMarker
-        let details = band?.publicDetails
+        // let dots: String? = band.map { b in
+        //     b.dotString(filled: b.dot_spread_count)
+        // }
 
         return HTML.div(["class": "ph-program-banner__inner"]) {
             HTML.div(["class": "ph-program-banner__top"]) {
 
                 HTML.div(["class": "ph-program-banner__title"]) {
-                    HTML.text(" indicatie")
+                    // HTML.text("(!) Belangrijk")
+                    HTML.text("Over dit programma")
                 }
 
-                if let marker, let details {
-                    HTML.div(["class": "ph-program-banner__badge"]) {
-                        HTML.span(["class": "ph-program-banner__badge-mark"]) { HTML.text(marker) }
-                        HTML.span(["class": "ph-program-banner__badge-text"]) { HTML.text("band: \(details)") }
-                    }
-                }
+                // if let dots {
+                //     HTML.div(["class": "ph-program-banner__dots"]) {
+                //         // HTML.span(["class": "ph-program-banner__dots-label"]) {
+                //         //     HTML.text("spreiding")
+                //         // }
+                //         HTML.span(["class": "ph-program-banner__dots-value"]) {
+                //             HTML.text(dots)
+                //         }
+                //     }
+                // }
             }
 
             HTML.p(["class": "ph-program-banner__body"]) {
                 HTML.text(
-                    "Dit programma-overzicht is een richtlijn en geeft richting aan de opbouw. " +
-                    "In de praktijk kunnen onderdelen, volgorde en tijdsbesteding wijzigen op basis van voortgang en behoeften. "
+                    "Dit programma-overzicht is een richtlijn en geeft " +
+                    "richting aan de opbouw. " +
+                    "In de praktijk kunnen onderdelen, volgorde en " +
+                    "tijdsbesteding wijzigen op basis van voortgang en behoeften. "
                 )
             }
         }
     }
+
+    // private static func renderProgramBanner(band: ProgramTally.EstimateBand?) -> any HTMLNode {
+    //     let marker = band?.publicMarker
+    //     let details = band?.publicDetails
+
+    //     return HTML.div(["class": "ph-program-banner__inner"]) {
+    //         HTML.div(["class": "ph-program-banner__top"]) {
+
+    //             HTML.div(["class": "ph-program-banner__title"]) {
+    //                 HTML.text("Belangrijke indicatie")
+    //             }
+
+    //             if let marker, let details {
+    //                 HTML.div(["class": "ph-program-banner__badge"]) {
+    //                     HTML.span(["class": "ph-program-banner__badge-mark"]) { HTML.text(marker) }
+    //                     HTML.span(["class": "ph-program-banner__badge-text"]) { HTML.text("band: \(details)") }
+    //                 }
+    //             }
+    //         }
+
+    //         HTML.p(["class": "ph-program-banner__body"]) {
+    //             HTML.text(
+    //                 "Dit programma-overzicht is een richtlijn en geeft richting aan de opbouw. " +
+    //                 "In de praktijk kunnen onderdelen, volgorde en tijdsbesteding wijzigen op basis van voortgang en behoeften. "
+    //             )
+    //         }
+    //     }
+    // }
 
     private static func renderPackage(_ pkg: Package) -> HTMLFragment {
         return [
@@ -2811,6 +2873,115 @@ public enum ProgramHTMLStyles {
             )
         )
 
+        // // program banner
+        // CSS.rule(
+        //     ".ph-program-banner",
+        //     CSS.decl("margin", "0 0 16px")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__inner",
+        //     CSS.decl("padding", "12px 14px"),
+        //     CSS.decl("background", "#f8fafc"),
+        //     CSS.decl("border", "1px solid #ececf2"),
+        //     CSS.decl("border-radius", "12px")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__top",
+        //     CSS.decl("display", "flex"),
+        //     CSS.decl("justify-content", "space-between"),
+        //     CSS.decl("align-items", "center"),
+        //     CSS.decl("gap", "14px"),
+        //     CSS.decl("margin", "0 0 8px")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__title",
+        //     CSS.decl("font-weight", "700"),
+        //     CSS.decl("font-size", "12.5px"),
+        //     CSS.decl("color", "#111827"),
+        //     CSS.decl("letter-spacing", "0.2px")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__badge",
+        //     CSS.decl("display", "inline-flex"),
+        //     CSS.decl("align-items", "center"),
+        //     CSS.decl("gap", "8px"),
+        //     CSS.decl("flex", "0 0 auto")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__badge-mark",
+        //     CSS.decl("display", "inline-flex"),
+        //     CSS.decl("align-items", "center"),
+        //     CSS.decl("justify-content", "center"),
+        //     CSS.decl("width", "24px"),
+        //     CSS.decl("height", "24px"),
+        //     CSS.decl("border-radius", "999px"),
+        //     CSS.decl("background", "#ffffff"),
+        //     CSS.decl("box-shadow", "inset 0 0 0 1px #ececf2"),
+        //     CSS.decl("font-weight", "800"),
+        //     CSS.decl("font-size", "12px"),
+        //     CSS.decl("color", "#111827")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__badge-text",
+        //     CSS.decl("font-size", "11.5px"),
+        //     CSS.decl("font-weight", "400"),
+        //     CSS.decl("color", "#374151"),
+        //     CSS.decl("white-space", "nowrap"),
+        //     CSS.decl("opacity", "0.95")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__body",
+        //     CSS.decl("margin", "0"),
+        //     CSS.decl("font-size", "12.5px"),
+        //     CSS.decl("color", "#374151"),
+        //     CSS.decl("line-height", "1.45")
+        // )
+
+        // CSS.media(
+        //     "print",
+        //     CSS.rule(
+        //         ".ph-program-banner__inner",
+        //         CSS.decl("break-inside", "avoid"),
+        //         CSS.decl("page-break-inside", "avoid")
+        //     )
+        // )
+
+
+        // CSS.rule(
+        //     ".ph-program-banner__dots",
+        //     CSS.decl("display", "inline-flex"),
+        //     CSS.decl("align-items", "center"),
+        //     CSS.decl("gap", "8px"),
+        //     CSS.decl("flex", "0 0 auto")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__dots-label",
+        //     CSS.decl("font-size", "11px"),
+        //     CSS.decl("font-weight", "600"),
+        //     CSS.decl("letter-spacing", "0.4px"),
+        //     CSS.decl("text-transform", "uppercase"),
+        //     CSS.decl("color", "#6b7280"),
+        //     CSS.decl("opacity", "0.9"),
+        //     CSS.decl("white-space", "nowrap")
+        // )
+
+        // CSS.rule(
+        //     ".ph-program-banner__dots-value",
+        //     CSS.decl("font-size", "12px"),
+        //     CSS.decl("font-weight", "800"),
+        //     CSS.decl("letter-spacing", "1.2px"),
+        //     CSS.decl("color", "#111827"),
+        //     CSS.decl("white-space", "nowrap")
+        // )
+
         // program banner
         CSS.rule(
             ".ph-program-banner",
@@ -2820,9 +2991,16 @@ public enum ProgramHTMLStyles {
         CSS.rule(
             ".ph-program-banner__inner",
             CSS.decl("padding", "12px 14px"),
-            CSS.decl("background", "#f8fafc"),
-            CSS.decl("border", "1px solid #ececf2"),
-            CSS.decl("border-radius", "12px")
+            CSS.decl("border-radius", "12px"),
+
+            // warning-ish but soft: warm paper tint
+            CSS.decl("background", "#fffbeb"),
+            CSS.decl("border", "1px solid #fde68a"),
+
+            // callout rail
+            CSS.decl("border-left-width", "4px"),
+            CSS.decl("border-left-style", "solid"),
+            CSS.decl("border-left-color", "#f59e0b")
         )
 
         CSS.rule(
@@ -2836,50 +3014,38 @@ public enum ProgramHTMLStyles {
 
         CSS.rule(
             ".ph-program-banner__title",
-            CSS.decl("font-weight", "700"),
-            CSS.decl("font-size", "12.5px"),
-            CSS.decl("color", "#111827"),
-            CSS.decl("letter-spacing", "0.2px")
-        )
-
-        CSS.rule(
-            ".ph-program-banner__badge",
-            CSS.decl("display", "inline-flex"),
-            CSS.decl("align-items", "center"),
-            CSS.decl("gap", "8px"),
-            CSS.decl("flex", "0 0 auto")
-        )
-
-        CSS.rule(
-            ".ph-program-banner__badge-mark",
-            CSS.decl("display", "inline-flex"),
-            CSS.decl("align-items", "center"),
-            CSS.decl("justify-content", "center"),
-            CSS.decl("width", "24px"),
-            CSS.decl("height", "24px"),
-            CSS.decl("border-radius", "999px"),
-            CSS.decl("background", "#ffffff"),
-            CSS.decl("box-shadow", "inset 0 0 0 1px #ececf2"),
             CSS.decl("font-weight", "800"),
-            CSS.decl("font-size", "12px"),
-            CSS.decl("color", "#111827")
-        )
-
-        CSS.rule(
-            ".ph-program-banner__badge-text",
-            CSS.decl("font-size", "11.5px"),
-            CSS.decl("font-weight", "400"),
-            CSS.decl("color", "#374151"),
-            CSS.decl("white-space", "nowrap"),
-            CSS.decl("opacity", "0.95")
+            CSS.decl("font-size", "12.5px"),
+            CSS.decl("letter-spacing", "0.3px"),
+            CSS.decl("color", "#92400e")
         )
 
         CSS.rule(
             ".ph-program-banner__body",
             CSS.decl("margin", "0"),
             CSS.decl("font-size", "12.5px"),
-            CSS.decl("color", "#374151"),
+            CSS.decl("color", "#78350f"),
             CSS.decl("line-height", "1.45")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__dots",
+            CSS.decl("display", "inline-flex"),
+            CSS.decl("align-items", "center"),
+            CSS.decl("flex", "0 0 auto"),
+            CSS.decl("padding", "4px 8px"),
+            CSS.decl("border-radius", "999px"),
+            CSS.decl("background", "rgba(255, 255, 255, 0.7)"),
+            CSS.decl("box-shadow", "inset 0 0 0 1px rgba(0,0,0,0.06)")
+        )
+
+        CSS.rule(
+            ".ph-program-banner__dots-value",
+            CSS.decl("font-size", "12px"),
+            CSS.decl("font-weight", "900"),
+            CSS.decl("letter-spacing", "1.4px"),
+            CSS.decl("color", "#92400e"),
+            CSS.decl("white-space", "nowrap")
         )
 
         CSS.media(
@@ -2890,6 +3056,310 @@ public enum ProgramHTMLStyles {
                 CSS.decl("page-break-inside", "avoid")
             )
         )
+
+        CSS.media(
+            "print",
+
+            // --- WeasyPrint layout stability (avoid flex fragmentation/overlap) ---
+
+            // 1) Kill flex stacking inside component rows (gap -> margins)
+            CSS.rule(
+                ".ph-component-main",
+                CSS.decl("display", "block")
+            ),
+            CSS.rule(
+                ".ph-component-main > * + *",
+                CSS.decl("margin-top", "6px")
+            ),
+
+            // 2) Kill flex column lists in print (critical: fixes exchangeable box height/overlap)
+            CSS.rule(
+                ".ph-component-list",
+                CSS.decl("display", "block")
+            ),
+            CSS.rule(
+                ".ph-component-list--exchangeable",
+                CSS.decl("display", "block")
+            ),
+            CSS.rule(
+                ".ph-exchangeable-box",
+                CSS.decl("display", "block")
+            ),
+
+            // 3) Chips: render as simple inline blocks in print
+            CSS.rule(
+                ".ph-component-chips",
+                CSS.decl("display", "block")
+            ),
+            CSS.rule(
+                ".ph-chip",
+                CSS.decl("display", "inline-block"),
+                CSS.decl("margin", "0 6px 6px 0")
+            ),
+
+            // 4) Pagination rules for exchangeables
+            CSS.rule(
+                ".ph-exchangeable-box",
+                CSS.decl("break-inside", "auto"),
+                CSS.decl("page-break-inside", "auto")
+            ),
+            CSS.rule(
+                ".ph-exchangeable-title",
+                CSS.decl("break-after", "avoid"),
+                CSS.decl("page-break-after", "avoid")
+            ),
+            CSS.rule(
+                ".ph-component-list--exchangeable .ph-component-row",
+                CSS.decl("break-inside", "avoid"),
+                CSS.decl("page-break-inside", "avoid")
+            ),
+
+            // 5) Docdata: avoid flex overlap in print by switching to grid
+            CSS.rule(
+                ".ph-docdata-line",
+                CSS.decl("display", "grid"),
+                CSS.decl("grid-template-columns", "140px 1fr"),
+                CSS.decl("column-gap", "10px"),
+                CSS.decl("align-items", "start")
+            ),
+            CSS.rule(
+                ".ph-docdata-label",
+                CSS.decl("white-space", "nowrap")
+            ),
+            CSS.rule(
+                ".ph-docdata-value",
+                CSS.decl("min-width", "0"),
+                CSS.decl("word-break", "break-word")
+            )
+        )
+
+    }
+}
+
+(!): 1 blank lines
+
+
++-------------------------------------------------------+
+| Sources/_concept/views-hierarchy/program-pricer.swift |
++-------------------------------------------------------+
+import Foundation
+
+public enum ProgramPricer {}
+
+extension ProgramPricer {
+    public struct Input: Sendable, Hashable {
+        // Band range (precise doubles)
+        public var bandLow: Double
+        public var bandHigh: Double
+
+        // Strategy
+        public var pricingStrategy: PricingStrategy
+        public var midpointMarginPercent: Double
+        public var weightedHighWeightPercent: Double
+        public var weightedMarginPercent: Double
+
+        // Pricing inputs
+        public var sessionRate: Double
+        public var homeSessions: Int
+        public var travelDistanceKm: Double
+        public var travelRatePerKm: Double
+
+        public init(
+            bandLow: Double,
+            bandHigh: Double,
+            pricingStrategy: PricingStrategy,
+            midpointMarginPercent: Double,
+            weightedHighWeightPercent: Double,
+            weightedMarginPercent: Double,
+            sessionRate: Double,
+            homeSessions: Int,
+            travelDistanceKm: Double,
+            travelRatePerKm: Double
+        ) {
+            self.bandLow = bandLow
+            self.bandHigh = bandHigh
+            self.pricingStrategy = pricingStrategy
+            self.midpointMarginPercent = midpointMarginPercent
+            self.weightedHighWeightPercent = weightedHighWeightPercent
+            self.weightedMarginPercent = weightedMarginPercent
+            self.sessionRate = sessionRate
+            self.homeSessions = homeSessions
+            self.travelDistanceKm = travelDistanceKm
+            self.travelRatePerKm = travelRatePerKm
+        }
+    }
+}
+
+extension ProgramPricer {
+    public static func compute(_ input: Input) -> Result {
+        let low = max(0, input.bandLow)
+        let high = max(0, input.bandHigh)
+
+        let base: Double
+        let marginPercent: Double
+
+        switch input.pricingStrategy {
+        case .midpoint:
+            base = (low + high) / 2.0
+            marginPercent = clamp(input.midpointMarginPercent, 0, 200)
+
+        case .weighted_average:
+            let wHigh = clamp(input.weightedHighWeightPercent, 0, 100) / 100.0
+            let wLow = 1.0 - wHigh
+            base = (wLow * low) + (wHigh * high)
+            marginPercent = clamp(input.weightedMarginPercent, 0, 200)
+        }
+
+        let sessionsPrecise = max(0, base)
+        let sessionsCeiled = Int(ceil(sessionsPrecise))
+
+        let rate = max(0, input.sessionRate)
+
+        // Price based on decimals
+        let sessionCostPrecise = sessionsPrecise * rate
+
+        // Optional: conservative number you can still display
+        let sessionCostCeiled = Double(sessionsCeiled) * rate
+
+        let hs = max(0, input.homeSessions)
+        let km = max(0, input.travelDistanceKm)
+        let kmRate = max(0, input.travelRatePerKm)
+        let travelCost = Double(hs) * km * kmRate
+
+        // Subtotal uses precise session cost
+        let subtotal = sessionCostPrecise + travelCost
+
+        let marginFraction = marginPercent / 100.0
+        let total = subtotal * (1.0 + marginFraction)
+        let markup = total - subtotal
+
+        return Result(
+            bandLow: low,
+            bandHigh: high,
+            baseSessions: base,
+            sessionsPrecise: sessionsPrecise,
+            sessionsCeiled: sessionsCeiled,
+            marginPercent: marginPercent,
+            marginFraction: marginFraction,
+            sessionRate: rate,
+            sessionCostPrecise: sessionCostPrecise,
+            sessionCostCeiled: sessionCostCeiled,
+            homeSessions: hs,
+            travelDistanceKm: km,
+            travelRatePerKm: kmRate,
+            travelCost: travelCost,
+            subtotal: subtotal,
+            markupAmount: markup,
+            totalCost: total
+        )
+    }
+
+    private static func clamp(_ v: Double, _ lo: Double, _ hi: Double) -> Double {
+        max(lo, min(hi, v))
+    }
+
+    private static func roundToNearest(_ value: Double, step: Double) -> Double {
+        let s = abs(step)
+        guard s > 0 else { return value }
+        return (value / s).rounded(.toNearestOrAwayFromZero) * s
+    }
+}
+
+extension ProgramPricer {
+    public struct Result: Sendable, Hashable {
+        public var bandLow: Double
+        public var bandHigh: Double
+
+        public var baseSessions: Double
+
+        public var sessionsPrecise: Double
+        public var sessionsCeiled: Int
+
+        public var marginPercent: Double
+        public var marginFraction: Double
+
+        public var sessionRate: Double
+
+        public var sessionCostPrecise: Double
+        public var sessionCostCeiled: Double
+
+        public var homeSessions: Int
+        public var travelDistanceKm: Double
+        public var travelRatePerKm: Double
+        public var travelCost: Double
+
+        public var subtotal: Double
+        public var markupAmount: Double
+        public var totalCost: Double
+
+        public func formulaLine(strategy: PricingStrategy, weightedHighWeightPercent: Double) -> String {
+            switch strategy {
+            case .midpoint:
+                return "base = (low + high) / 2"
+            case .weighted_average:
+                let wHigh = max(0, min(100, weightedHighWeightPercent))
+                let wLow = 100.0 - wHigh
+                return "base = \(format2(wLow / 100.0))×low + \(format2(wHigh / 100.0))×high"
+            }
+        }
+
+        /// Rounded to nearest 10 by default (e.g. 3,243 -> 3,240 ; 3,245 -> 3,250).
+        public var totalCostRounded: Double {
+            roundedTotalCost()
+        }
+
+        /// Choose your own step (10, 25, 50, 100, ...)
+        public func roundedTotalCost(toNearest step: Double = 10) -> Double {
+            ProgramPricer.roundToNearest(totalCost, step: step)
+        }
+
+        public var bandLine: String {
+            "\(formatSessions(bandLow))–\(formatSessions(bandHigh)) sess"
+        }
+
+        public var baseLine: String {
+            "\(formatSessions(baseSessions)) sess"
+        }
+
+        public var marginLine: String {
+            "\(formatSessions(marginPercent))%"
+        }
+
+        public var sessionsLine: String { "\(sessionsCeiled) sess" }
+
+        public func sessionCostLine(formatMoney: (Double) -> String) -> String {
+            "\(formatSessions(sessionsPrecise)) × \(formatMoney(sessionRate)) = \(formatMoney(sessionCostPrecise))"
+        }
+
+        public func sessionCostCeiledLine(formatMoney: (Double) -> String) -> String {
+            "\(sessionsCeiled) × \(formatMoney(sessionRate)) = \(formatMoney(sessionCostCeiled))"
+        }
+
+        public func travelCostLine(formatMoney: (Double) -> String) -> String {
+            "\(homeSessions) × \(format2(travelDistanceKm)) km × \(formatMoney(travelRatePerKm)) = \(formatMoney(travelCost))"
+        }
+
+        public func subtotalLine(formatMoney: (Double) -> String) -> String {
+            "\(formatMoney(sessionCostPrecise)) + \(formatMoney(travelCost)) = \(formatMoney(subtotal))"
+        }
+
+        public func markupLine(formatMoney: (Double) -> String) -> String {
+            formatMoney(markupAmount)
+        }
+
+        public func totalLine(formatMoney: (Double) -> String) -> String {
+            "\(formatMoney(subtotal)) + \(formatMoney(markupAmount)) = \(formatMoney(totalCost))"
+        }
+
+        public func roundedTotalLine(
+            toNearest step: Double = 10,
+            formatMoney: (Double) -> String
+        ) -> String {
+            let rounded = roundedTotalCost(toNearest: step)
+            return "\(formatMoney(totalCost)) to nearest \(Int(step)) -> \(formatMoney(rounded))"
+        }
+
+        private func format2(_ v: Double) -> String { String(format: "%.2f", v) }
     }
 }
 
@@ -3030,7 +3500,7 @@ public enum ProgramTally {
 
                     let r = alloc.minutes.session_range(session_duration: sessionDuration)
                     low += r.low
-                    medium += r.effectiveMedium()
+                    medium += r.medium ?? r.effectiveMedium()
                     high += r.high
                 }
             }
@@ -3051,35 +3521,58 @@ public enum ProgramTally {
             b = high
         }
 
-        let roundedA = Int(a.rounded(.toNearestOrAwayFromZero))
-        let roundedB = Int(b.rounded(.toNearestOrAwayFromZero))
+        // let roundedA = Int(a.rounded(.toNearestOrAwayFromZero))
+        // let roundedB = Int(b.rounded(.toNearestOrAwayFromZero))
 
-        return .init(
-            low: Double(roundedA),
-            high: Double(roundedB)
-        )
+        // return .init(
+        //     low: Double(roundedA),
+        //     high: Double(roundedB)
+        // )
+        return .init(low: a, high: b)
     }
+
+    // public static func minutes(
+    //     program: Program,
+    //     placements: Set<ModuleComponentPlacement> = [.elementary]
+    // ) -> MinuteRange {
+    //     var low: Int = 0
+    //     var high: Int = 0
+
+    //     for pkg in program {
+    //         for module in pkg.modules {
+    //             for entry in module.entries where shouldCount(entry, placements: placements) {
+    //                 guard let alloc = entry.component.allocation else { continue }
+    //                 low += alloc.minutes.low
+    //                 high += alloc.minutes.high
+    //             }
+    //         }
+    //     }
+
+    //     return .init(low: low, high: high)
+    // }
 
     public static func minutes(
         program: Program,
         placements: Set<ModuleComponentPlacement> = [.elementary]
     ) -> MinuteRange {
         var low: Int = 0
+        var medium: Int = 0
         var high: Int = 0
 
         for pkg in program {
             for module in pkg.modules {
                 for entry in module.entries where shouldCount(entry, placements: placements) {
                     guard let alloc = entry.component.allocation else { continue }
+
                     low += alloc.minutes.low
+                    medium += alloc.minutes.medium ?? alloc.minutes.effectiveMedium()
                     high += alloc.minutes.high
                 }
             }
         }
 
-        return .init(low: low, high: high)
+        return .init(low: low, medium: medium, high: high)
     }
-
 }
 
 (!): 1 blank lines
@@ -3095,15 +3588,11 @@ public final class ProgramEditorViewModel: ObservableObject {
     @Published public var program: Program
     @Published public var selectedPackageID: Package.ID?
 
-    // Swap UI state
     @Published public var swapTarget: SwapTarget?
 
-    @Published public var estimateBand: ProgramTally.EstimateBand = .low_high
+    @Published public var estimateBand: ProgramTally.EstimateBand = .low_medium
     @Published public var tallyPlacements: Set<ModuleComponentPlacement> = [.elementary]
 
-    // ---------------------------------------------------------
-    // PRICING
-    // ---------------------------------------------------------
     @Published public var sessionRate: Double = 300
     @Published public var homeSessions: Int = 0
     @Published public var travelDistanceKm: Double = 0
@@ -3111,13 +3600,12 @@ public final class ProgramEditorViewModel: ObservableObject {
 
     @Published public var includePriceInProgram: Bool = true
 
-    // ---------------------------------------------------------
-    // PRICING STRATEGY
-    // ---------------------------------------------------------
     @Published public var pricingStrategy: PricingStrategy = .weighted_average
     @Published public var midpointMarginPercent: Double = 15
     @Published public var weightedHighWeightPercent: Double = 65
     @Published public var weightedMarginPercent: Double = 0
+
+    @Published public var priceRoundingStep: Double = 10
 
     private static let euroFormatter: NumberFormatter = {
         let f = NumberFormatter()
@@ -3211,77 +3699,12 @@ public final class ProgramEditorViewModel: ObservableObject {
         return "\(t.low)–\(t.high)"
     }
 
-    // // ---------------------------------------------------------
-    // // PRICING (derived)
-    // // ---------------------------------------------------------
-    // private var includedProgram: Program {
-    //     program.filter { $0.include }
-    // }
-
-    // public var pricedSessionRangeRounded: SessionRange.Rounded {
-    //     ProgramTally.sessions(
-    //         program: includedProgram,
-    //         sessionDuration: sessionDuration,
-    //         band: estimateBand,
-    //         placements: tallyPlacements
-    //     ).rounded
-    // }
-
-    // // /// Uses the "high" value of the currently selected estimate band.
-    // // public var pricedSessionsHigh: Int {
-    // //     pricedSessionRangeRounded.high
-    // // }
-
-    // // public var estimatedSessionCost: Double {
-    // //     Double(pricedSessionsHigh) * max(0, sessionRate)
-    // // }
-
-    // // private func clamp(_ v: Double, _ lo: Double, _ hi: Double) -> Double {
-    // //     max(lo, min(hi, v))
-    // // }
-
-    // private var pricedSessionsForPricing: Int {
-    //     let r = pricedSessionRangeRounded
-    //     let low = Double(max(0, r.low))
-    //     let high = Double(max(0, r.high))
-
-    //     let base: Double
-    //     let marginFraction: Double
-
-    //     switch pricingStrategy {
-    //     case .midpoint:
-    //         base = (low + high) / 2.0
-    //         marginFraction = clamp(midpointMarginPercent, 0, 200) / 100.0
-
-    //     case .weighted_average:
-    //         let wHigh = clamp(weightedHighWeightPercent, 0, 100) / 100.0
-    //         let wLow = 1.0 - wHigh
-    //         base = (wLow * low) + (wHigh * high)
-    //         marginFraction = clamp(weightedMarginPercent, 0, 200) / 100.0
-    //     }
-
-    //     let withMargin = base * (1.0 + marginFraction)
-    //     return Int(ceil(withMargin))
-    // }
-
-    // public var estimatedSessionCost: Double {
-    //     Double(pricedSessionsForPricing) * max(0, sessionRate)
-    // }
-
-    // public var estimatedTravelCost: Double {
-    //     let hs = Double(max(0, homeSessions))
-    //     let km = max(0, travelDistanceKm)
-    //     let rate = max(0, travelRatePerKm)
-    //     return hs * km * rate
-    // }
-
-    // public var estimatedTotalCost: Double {
-    //     estimatedSessionCost + estimatedTravelCost
-    // }
-
-    // public var estimatedTotalCostLabel: String {
-    //     Self.formatEUR(estimatedTotalCost)
-    // }
+    public var totalSessionsLabelRounded: String {
+        let r = totalSessions.rounded
+        if r.low == 0 && r.high == 0 { return "—" }
+        if r.low == r.high { return "\(r.low)" }
+        return "\(r.low)–\(r.high)"
+    }
 }
 
 public extension ProgramEditorViewModel {
@@ -3289,158 +3712,79 @@ public extension ProgramEditorViewModel {
         program.filter { $0.include }
     }
 
-    var pricedSessionRangeRounded: SessionRange.Rounded {
+    var pricedSessionRangePrecise: SessionRange {
         ProgramTally.sessions(
             program: includedProgram,
             sessionDuration: sessionDuration,
             band: estimateBand,
             placements: tallyPlacements
-        ).rounded
+        )
     }
 
-    /// Base session estimate (no margin applied here).
-    private var pricingBaseSessions: Double {
-        let r = pricedSessionRangeRounded
-        let low = Double(max(0, r.low))
-        let high = Double(max(0, r.high))
-
-        switch pricingStrategy {
-        case .midpoint:
-            return (low + high) / 2.0
-
-        case .weighted_average:
-            let wHigh = clamp(weightedHighWeightPercent, 0, 100) / 100.0
-            let wLow = 1.0 - wHigh
-            return (wLow * low) + (wHigh * high)
-        }
+    var pricedSessionRangeRounded: SessionRange.Rounded {
+        pricedSessionRangePrecise.rounded
     }
 
-    /// Sessions used for pricing (ceil of base). Margin is a PRICE markup, not added sessions.
-    private var pricedSessionsForPricing: Int {
-        Int(ceil(max(0, pricingBaseSessions)))
+    private var pricerInput: ProgramPricer.Input {
+        let r = pricedSessionRangePrecise
+        return .init(
+            bandLow: max(0, r.low),
+            bandHigh: max(0, r.high),
+            pricingStrategy: pricingStrategy,
+            midpointMarginPercent: midpointMarginPercent,
+            weightedHighWeightPercent: weightedHighWeightPercent,
+            weightedMarginPercent: weightedMarginPercent,
+            sessionRate: sessionRate,
+            homeSessions: homeSessions,
+            travelDistanceKm: travelDistanceKm,
+            travelRatePerKm: travelRatePerKm
+        )
     }
 
-    var estimatedSessionCost: Double {
-        Double(pricedSessionsForPricing) * max(0, sessionRate)
+    private var pricerResult: ProgramPricer.Result {
+        ProgramPricer.compute(pricerInput)
     }
 
-    var estimatedTravelCost: Double {
-        let hs = Double(max(0, homeSessions))
-        let km = max(0, travelDistanceKm)
-        let rate = max(0, travelRatePerKm)
-        return hs * km * rate
-    }
-
-    /// Subtotal before margin/markup.
-    var estimatedSubtotalCost: Double {
-        estimatedSessionCost + estimatedTravelCost
-    }
-
-    /// Margin percent for the currently selected strategy (price markup).
-    var pricingMarginPercent: Double {
-        switch pricingStrategy {
-        case .midpoint:
-            return clamp(midpointMarginPercent, 0, 200)
-        case .weighted_average:
-            return clamp(weightedMarginPercent, 0, 200)
-        }
-    }
-
-    var pricingMarginFraction: Double {
-        pricingMarginPercent / 100.0
-    }
-
-    /// Total cost includes PRICE markup on subtotal.
-    var estimatedTotalCost: Double {
-        estimatedSubtotalCost * (1.0 + pricingMarginFraction)
-    }
+    var estimatedSessionCost: Double { pricerResult.sessionCostPrecise }
+    var estimatedTravelCost: Double { pricerResult.travelCost }
+    var estimatedSubtotalCost: Double { pricerResult.subtotal }
+    var pricingMarginPercent: Double { pricerResult.marginPercent }
+    var pricingMarginFraction: Double { pricerResult.marginFraction }
+    var estimatedTotalCost: Double { pricerResult.totalCost }
 
     var estimatedTotalCostLabel: String {
         Self.formatEUR(estimatedTotalCost)
     }
+
+    var estimatedTotalCostRoundedLine: String {
+        pricerResult.roundedTotalLine(toNearest: priceRoundingStep, formatMoney: formatMoney)
+    }
 }
 
-public func clamp(_ v: Double, _ lo: Double, _ hi: Double) -> Double {
-    max(lo, min(hi, v))
-}
+// public func clamp(_ v: Double, _ lo: Double, _ hi: Double) -> Double {
+//     max(lo, min(hi, v))
+// }
 
 public extension ProgramEditorViewModel {
-    struct PricingDebug: Sendable, Hashable {
-        public let bandLow: Int
-        public let bandHigh: Int
-
-        public let baseSessions: Double
-        public let sessionsCeiled: Int
-
-        public let marginPercent: Double
-        public let marginFraction: Double
-
-        public let sessionRate: Double
-        public let sessionCost: Double
-
-        public let homeSessions: Int
-        public let travelDistanceKm: Double
-        public let travelRatePerKm: Double
-        public let travelCost: Double
-
-        public let subtotal: Double
-        public let markupAmount: Double
-        public let totalCost: Double
-    }
+    typealias PricingDebug = ProgramPricer.Result
 
     private func makeDebug(strategy: PricingStrategy) -> PricingDebug {
-        let r = pricedSessionRangeRounded
-        let low = Double(max(0, r.low))
-        let high = Double(max(0, r.high))
+        // let r = pricedSessionRangeRounded
+        let r = pricedSessionRangePrecise
 
-        let base: Double
-        let marginPercent: Double
-
-        switch strategy {
-        case .midpoint:
-            base = (low + high) / 2.0
-            marginPercent = clamp(midpointMarginPercent, 0, 200)
-
-        case .weighted_average:
-            let wHigh = clamp(weightedHighWeightPercent, 0, 100) / 100.0
-            let wLow = 1.0 - wHigh
-            base = (wLow * low) + (wHigh * high)
-            marginPercent = clamp(weightedMarginPercent, 0, 200)
-        }
-
-        let sessionsCeiled = Int(ceil(max(0, base)))
-
-        let rate = max(0, sessionRate)
-        let sessionCost = Double(sessionsCeiled) * rate
-
-        let hs = max(0, homeSessions)
-        let km = max(0, travelDistanceKm)
-        let kmRate = max(0, travelRatePerKm)
-        let travelCost = Double(hs) * km * kmRate
-
-        let subtotal = sessionCost + travelCost
-
-        let marginFraction = marginPercent / 100.0
-        let total = subtotal * (1.0 + marginFraction)
-        let markup = total - subtotal
-
-        return PricingDebug(
+        let input = ProgramPricer.Input(
             bandLow: max(0, r.low),
             bandHigh: max(0, r.high),
-            baseSessions: base,
-            sessionsCeiled: sessionsCeiled,
-            marginPercent: marginPercent,
-            marginFraction: marginFraction,
-            sessionRate: rate,
-            sessionCost: sessionCost,
-            homeSessions: hs,
-            travelDistanceKm: km,
-            travelRatePerKm: kmRate,
-            travelCost: travelCost,
-            subtotal: subtotal,
-            markupAmount: markup,
-            totalCost: total
+            pricingStrategy: strategy,
+            midpointMarginPercent: midpointMarginPercent,
+            weightedHighWeightPercent: weightedHighWeightPercent,
+            weightedMarginPercent: weightedMarginPercent,
+            sessionRate: sessionRate,
+            homeSessions: homeSessions,
+            travelDistanceKm: travelDistanceKm,
+            travelRatePerKm: travelRatePerKm
         )
+        return ProgramPricer.compute(input)
     }
 
     var pricingDebugWeighted: PricingDebug {
@@ -3524,6 +3868,10 @@ public struct ProgramEditorView: View {
                                 travelDistanceKm: vm.travelDistanceKm,
                                 travelRatePerKm: vm.travelRatePerKm,
                                 includePriceInProgram: vm.includePriceInProgram,
+                                pricingStrategy: vm.pricingStrategy,
+                                midpointMarginPercent: vm.midpointMarginPercent,
+                                weightedHighWeightPercent: vm.weightedHighWeightPercent,
+                                weightedMarginPercent: vm.weightedMarginPercent,
                             )
                         )
 
@@ -3614,18 +3962,20 @@ private struct PricingBreakdown: View {
                     title: "Weighted",
                     isActive: vm.pricingStrategy == .weighted_average,
                     debug: vm.pricingDebugWeighted,
-                    baseLine: {
-                        let wHigh = max(0, min(100, vm.weightedHighWeightPercent))
-                        let wLow = 100.0 - wHigh
-                        return "base = \(vm.formatNumber2(wLow / 100.0))×low + \(vm.formatNumber2(wHigh / 100.0))×high"
-                    }()
+                    baseLine: vm.pricingDebugWeighted.formulaLine(
+                        strategy: .weighted_average,
+                        weightedHighWeightPercent: vm.weightedHighWeightPercent
+                    )
                 )
 
                 breakdownCard(
                     title: "Midpoint",
                     isActive: vm.pricingStrategy == .midpoint,
                     debug: vm.pricingDebugMidpoint,
-                    baseLine: "base = (low + high) / 2"
+                    baseLine: vm.pricingDebugMidpoint.formulaLine(
+                        strategy: .midpoint,
+                        weightedHighWeightPercent: vm.weightedHighWeightPercent
+                    )
                 )
             }
         }
@@ -3652,28 +4002,29 @@ private struct PricingBreakdown: View {
             }
 
             Group {
-                line("band", "\(debug.bandLow)–\(debug.bandHigh) sess")
-                line("base", "\(vm.formatNumber2(debug.baseSessions)) sess")
+                line("band", debug.bandLine)
+                line("base", debug.baseLine)
+
                 line("formule", baseLine)
 
                 line("ceil → sessies", "\(debug.sessionsCeiled) sess")
 
                 Divider().padding(.vertical, 2)
 
-                line("sessiekosten",
-                     "\(debug.sessionsCeiled) × \(vm.formatMoney(debug.sessionRate)) = \(vm.formatMoney(debug.sessionCost))")
+                line("sessiekosten", debug.sessionCostLine(formatMoney: vm.formatMoney))
+                line("reis", debug.travelCostLine(formatMoney: vm.formatMoney))
+                line("subtotaal", debug.subtotalLine(formatMoney: vm.formatMoney))
+                line("marge", debug.marginLine)
+                line("markup", debug.markupLine(formatMoney: vm.formatMoney))
+                line("totaal", debug.totalLine(formatMoney: vm.formatMoney))
 
-                line("reis",
-                     "\(debug.homeSessions) × \(vm.formatNumber2(debug.travelDistanceKm)) km × \(vm.formatMoney(debug.travelRatePerKm)) = \(vm.formatMoney(debug.travelCost))")
-
-                line("subtotaal",
-                     "\(vm.formatMoney(debug.sessionCost)) + \(vm.formatMoney(debug.travelCost)) = \(vm.formatMoney(debug.subtotal))")
-
-                line("marge", "\(vm.formatNumber2(debug.marginPercent))%")
-                line("markup", "\(vm.formatMoney(debug.markupAmount))")
-
-                line("totaal",
-                     "\(vm.formatMoney(debug.subtotal)) + \(vm.formatMoney(debug.markupAmount)) = \(vm.formatMoney(debug.totalCost))")
+                line(
+                    "afronden",
+                    debug.roundedTotalLine(
+                        toNearest: vm.priceRoundingStep,
+                        formatMoney: vm.formatMoney
+                    )
+                )
             }
             .font(.caption)
             .monospacedDigit()
@@ -3911,9 +4262,16 @@ public struct PackageListView: View {
 
                             Spacer()
 
-                            Text(vm.estimatedTotalCostLabel)
-                                .font(.subheadline)
-                                .monospacedDigit()
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text(vm.estimatedTotalCostLabel)
+                                    .font(.subheadline)
+                                    .monospacedDigit()
+
+                                Text(vm.estimatedTotalCostRoundedLine)
+                                    .font(.caption)
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                     .disabled(!vm.includePriceInProgram)

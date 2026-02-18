@@ -5,15 +5,11 @@ public final class ProgramEditorViewModel: ObservableObject {
     @Published public var program: Program
     @Published public var selectedPackageID: Package.ID?
 
-    // Swap UI state
     @Published public var swapTarget: SwapTarget?
 
     @Published public var estimateBand: ProgramTally.EstimateBand = .low_medium
     @Published public var tallyPlacements: Set<ModuleComponentPlacement> = [.elementary]
 
-    // ---------------------------------------------------------
-    // PRICING
-    // ---------------------------------------------------------
     @Published public var sessionRate: Double = 300
     @Published public var homeSessions: Int = 0
     @Published public var travelDistanceKm: Double = 0
@@ -21,13 +17,12 @@ public final class ProgramEditorViewModel: ObservableObject {
 
     @Published public var includePriceInProgram: Bool = true
 
-    // ---------------------------------------------------------
-    // PRICING STRATEGY
-    // ---------------------------------------------------------
     @Published public var pricingStrategy: PricingStrategy = .weighted_average
     @Published public var midpointMarginPercent: Double = 15
     @Published public var weightedHighWeightPercent: Double = 65
     @Published public var weightedMarginPercent: Double = 0
+
+    @Published public var priceRoundingStep: Double = 10
 
     private static let euroFormatter: NumberFormatter = {
         let f = NumberFormatter()
@@ -121,77 +116,12 @@ public final class ProgramEditorViewModel: ObservableObject {
         return "\(t.low)–\(t.high)"
     }
 
-    // // ---------------------------------------------------------
-    // // PRICING (derived)
-    // // ---------------------------------------------------------
-    // private var includedProgram: Program {
-    //     program.filter { $0.include }
-    // }
-
-    // public var pricedSessionRangeRounded: SessionRange.Rounded {
-    //     ProgramTally.sessions(
-    //         program: includedProgram,
-    //         sessionDuration: sessionDuration,
-    //         band: estimateBand,
-    //         placements: tallyPlacements
-    //     ).rounded
-    // }
-
-    // // /// Uses the "high" value of the currently selected estimate band.
-    // // public var pricedSessionsHigh: Int {
-    // //     pricedSessionRangeRounded.high
-    // // }
-
-    // // public var estimatedSessionCost: Double {
-    // //     Double(pricedSessionsHigh) * max(0, sessionRate)
-    // // }
-
-    // // private func clamp(_ v: Double, _ lo: Double, _ hi: Double) -> Double {
-    // //     max(lo, min(hi, v))
-    // // }
-
-    // private var pricedSessionsForPricing: Int {
-    //     let r = pricedSessionRangeRounded
-    //     let low = Double(max(0, r.low))
-    //     let high = Double(max(0, r.high))
-
-    //     let base: Double
-    //     let marginFraction: Double
-
-    //     switch pricingStrategy {
-    //     case .midpoint:
-    //         base = (low + high) / 2.0
-    //         marginFraction = clamp(midpointMarginPercent, 0, 200) / 100.0
-
-    //     case .weighted_average:
-    //         let wHigh = clamp(weightedHighWeightPercent, 0, 100) / 100.0
-    //         let wLow = 1.0 - wHigh
-    //         base = (wLow * low) + (wHigh * high)
-    //         marginFraction = clamp(weightedMarginPercent, 0, 200) / 100.0
-    //     }
-
-    //     let withMargin = base * (1.0 + marginFraction)
-    //     return Int(ceil(withMargin))
-    // }
-
-    // public var estimatedSessionCost: Double {
-    //     Double(pricedSessionsForPricing) * max(0, sessionRate)
-    // }
-
-    // public var estimatedTravelCost: Double {
-    //     let hs = Double(max(0, homeSessions))
-    //     let km = max(0, travelDistanceKm)
-    //     let rate = max(0, travelRatePerKm)
-    //     return hs * km * rate
-    // }
-
-    // public var estimatedTotalCost: Double {
-    //     estimatedSessionCost + estimatedTravelCost
-    // }
-
-    // public var estimatedTotalCostLabel: String {
-    //     Self.formatEUR(estimatedTotalCost)
-    // }
+    public var totalSessionsLabelRounded: String {
+        let r = totalSessions.rounded
+        if r.low == 0 && r.high == 0 { return "—" }
+        if r.low == r.high { return "\(r.low)" }
+        return "\(r.low)–\(r.high)"
+    }
 }
 
 public extension ProgramEditorViewModel {
@@ -199,158 +129,79 @@ public extension ProgramEditorViewModel {
         program.filter { $0.include }
     }
 
-    var pricedSessionRangeRounded: SessionRange.Rounded {
+    var pricedSessionRangePrecise: SessionRange {
         ProgramTally.sessions(
             program: includedProgram,
             sessionDuration: sessionDuration,
             band: estimateBand,
             placements: tallyPlacements
-        ).rounded
+        )
     }
 
-    /// Base session estimate (no margin applied here).
-    private var pricingBaseSessions: Double {
-        let r = pricedSessionRangeRounded
-        let low = Double(max(0, r.low))
-        let high = Double(max(0, r.high))
-
-        switch pricingStrategy {
-        case .midpoint:
-            return (low + high) / 2.0
-
-        case .weighted_average:
-            let wHigh = clamp(weightedHighWeightPercent, 0, 100) / 100.0
-            let wLow = 1.0 - wHigh
-            return (wLow * low) + (wHigh * high)
-        }
+    var pricedSessionRangeRounded: SessionRange.Rounded {
+        pricedSessionRangePrecise.rounded
     }
 
-    /// Sessions used for pricing (ceil of base). Margin is a PRICE markup, not added sessions.
-    private var pricedSessionsForPricing: Int {
-        Int(ceil(max(0, pricingBaseSessions)))
+    private var pricerInput: ProgramPricer.Input {
+        let r = pricedSessionRangePrecise
+        return .init(
+            bandLow: max(0, r.low),
+            bandHigh: max(0, r.high),
+            pricingStrategy: pricingStrategy,
+            midpointMarginPercent: midpointMarginPercent,
+            weightedHighWeightPercent: weightedHighWeightPercent,
+            weightedMarginPercent: weightedMarginPercent,
+            sessionRate: sessionRate,
+            homeSessions: homeSessions,
+            travelDistanceKm: travelDistanceKm,
+            travelRatePerKm: travelRatePerKm
+        )
     }
 
-    var estimatedSessionCost: Double {
-        Double(pricedSessionsForPricing) * max(0, sessionRate)
+    private var pricerResult: ProgramPricer.Result {
+        ProgramPricer.compute(pricerInput)
     }
 
-    var estimatedTravelCost: Double {
-        let hs = Double(max(0, homeSessions))
-        let km = max(0, travelDistanceKm)
-        let rate = max(0, travelRatePerKm)
-        return hs * km * rate
-    }
-
-    /// Subtotal before margin/markup.
-    var estimatedSubtotalCost: Double {
-        estimatedSessionCost + estimatedTravelCost
-    }
-
-    /// Margin percent for the currently selected strategy (price markup).
-    var pricingMarginPercent: Double {
-        switch pricingStrategy {
-        case .midpoint:
-            return clamp(midpointMarginPercent, 0, 200)
-        case .weighted_average:
-            return clamp(weightedMarginPercent, 0, 200)
-        }
-    }
-
-    var pricingMarginFraction: Double {
-        pricingMarginPercent / 100.0
-    }
-
-    /// Total cost includes PRICE markup on subtotal.
-    var estimatedTotalCost: Double {
-        estimatedSubtotalCost * (1.0 + pricingMarginFraction)
-    }
+    var estimatedSessionCost: Double { pricerResult.sessionCostPrecise }
+    var estimatedTravelCost: Double { pricerResult.travelCost }
+    var estimatedSubtotalCost: Double { pricerResult.subtotal }
+    var pricingMarginPercent: Double { pricerResult.marginPercent }
+    var pricingMarginFraction: Double { pricerResult.marginFraction }
+    var estimatedTotalCost: Double { pricerResult.totalCost }
 
     var estimatedTotalCostLabel: String {
         Self.formatEUR(estimatedTotalCost)
     }
+
+    var estimatedTotalCostRoundedLine: String {
+        pricerResult.roundedTotalLine(toNearest: priceRoundingStep, formatMoney: formatMoney)
+    }
 }
 
-public func clamp(_ v: Double, _ lo: Double, _ hi: Double) -> Double {
-    max(lo, min(hi, v))
-}
+// public func clamp(_ v: Double, _ lo: Double, _ hi: Double) -> Double {
+//     max(lo, min(hi, v))
+// }
 
 public extension ProgramEditorViewModel {
-    struct PricingDebug: Sendable, Hashable {
-        public let bandLow: Int
-        public let bandHigh: Int
-
-        public let baseSessions: Double
-        public let sessionsCeiled: Int
-
-        public let marginPercent: Double
-        public let marginFraction: Double
-
-        public let sessionRate: Double
-        public let sessionCost: Double
-
-        public let homeSessions: Int
-        public let travelDistanceKm: Double
-        public let travelRatePerKm: Double
-        public let travelCost: Double
-
-        public let subtotal: Double
-        public let markupAmount: Double
-        public let totalCost: Double
-    }
+    typealias PricingDebug = ProgramPricer.Result
 
     private func makeDebug(strategy: PricingStrategy) -> PricingDebug {
-        let r = pricedSessionRangeRounded
-        let low = Double(max(0, r.low))
-        let high = Double(max(0, r.high))
+        // let r = pricedSessionRangeRounded
+        let r = pricedSessionRangePrecise
 
-        let base: Double
-        let marginPercent: Double
-
-        switch strategy {
-        case .midpoint:
-            base = (low + high) / 2.0
-            marginPercent = clamp(midpointMarginPercent, 0, 200)
-
-        case .weighted_average:
-            let wHigh = clamp(weightedHighWeightPercent, 0, 100) / 100.0
-            let wLow = 1.0 - wHigh
-            base = (wLow * low) + (wHigh * high)
-            marginPercent = clamp(weightedMarginPercent, 0, 200)
-        }
-
-        let sessionsCeiled = Int(ceil(max(0, base)))
-
-        let rate = max(0, sessionRate)
-        let sessionCost = Double(sessionsCeiled) * rate
-
-        let hs = max(0, homeSessions)
-        let km = max(0, travelDistanceKm)
-        let kmRate = max(0, travelRatePerKm)
-        let travelCost = Double(hs) * km * kmRate
-
-        let subtotal = sessionCost + travelCost
-
-        let marginFraction = marginPercent / 100.0
-        let total = subtotal * (1.0 + marginFraction)
-        let markup = total - subtotal
-
-        return PricingDebug(
+        let input = ProgramPricer.Input(
             bandLow: max(0, r.low),
             bandHigh: max(0, r.high),
-            baseSessions: base,
-            sessionsCeiled: sessionsCeiled,
-            marginPercent: marginPercent,
-            marginFraction: marginFraction,
-            sessionRate: rate,
-            sessionCost: sessionCost,
-            homeSessions: hs,
-            travelDistanceKm: km,
-            travelRatePerKm: kmRate,
-            travelCost: travelCost,
-            subtotal: subtotal,
-            markupAmount: markup,
-            totalCost: total
+            pricingStrategy: strategy,
+            midpointMarginPercent: midpointMarginPercent,
+            weightedHighWeightPercent: weightedHighWeightPercent,
+            weightedMarginPercent: weightedMarginPercent,
+            sessionRate: sessionRate,
+            homeSessions: homeSessions,
+            travelDistanceKm: travelDistanceKm,
+            travelRatePerKm: travelRatePerKm
         )
+        return ProgramPricer.compute(input)
     }
 
     var pricingDebugWeighted: PricingDebug {

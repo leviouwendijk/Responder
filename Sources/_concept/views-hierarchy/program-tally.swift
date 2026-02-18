@@ -109,7 +109,7 @@ public enum ProgramTally {
 
                     let r = alloc.minutes.session_range(session_duration: sessionDuration)
                     low += r.low
-                    medium += r.effectiveMedium()
+                    medium += r.medium ?? r.effectiveMedium()
                     high += r.high
                 }
             }
@@ -130,33 +130,56 @@ public enum ProgramTally {
             b = high
         }
 
-        let roundedA = Int(a.rounded(.toNearestOrAwayFromZero))
-        let roundedB = Int(b.rounded(.toNearestOrAwayFromZero))
+        // let roundedA = Int(a.rounded(.toNearestOrAwayFromZero))
+        // let roundedB = Int(b.rounded(.toNearestOrAwayFromZero))
 
-        return .init(
-            low: Double(roundedA),
-            high: Double(roundedB)
-        )
+        // return .init(
+        //     low: Double(roundedA),
+        //     high: Double(roundedB)
+        // )
+        return .init(low: a, high: b)
     }
+
+    // public static func minutes(
+    //     program: Program,
+    //     placements: Set<ModuleComponentPlacement> = [.elementary]
+    // ) -> MinuteRange {
+    //     var low: Int = 0
+    //     var high: Int = 0
+
+    //     for pkg in program {
+    //         for module in pkg.modules {
+    //             for entry in module.entries where shouldCount(entry, placements: placements) {
+    //                 guard let alloc = entry.component.allocation else { continue }
+    //                 low += alloc.minutes.low
+    //                 high += alloc.minutes.high
+    //             }
+    //         }
+    //     }
+
+    //     return .init(low: low, high: high)
+    // }
 
     public static func minutes(
         program: Program,
         placements: Set<ModuleComponentPlacement> = [.elementary]
     ) -> MinuteRange {
         var low: Int = 0
+        var medium: Int = 0
         var high: Int = 0
 
         for pkg in program {
             for module in pkg.modules {
                 for entry in module.entries where shouldCount(entry, placements: placements) {
                     guard let alloc = entry.component.allocation else { continue }
+
                     low += alloc.minutes.low
+                    medium += alloc.minutes.medium ?? alloc.minutes.effectiveMedium()
                     high += alloc.minutes.high
                 }
             }
         }
 
-        return .init(low: low, high: high)
+        return .init(low: low, medium: medium, high: high)
     }
-
 }

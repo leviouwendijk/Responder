@@ -22,6 +22,11 @@ public enum ProgramExport {
 
         public var includePriceInProgram: Bool
 
+        public var pricingStrategy: PricingStrategy
+        public var midpointMarginPercent: Double
+        public var weightedHighWeightPercent: Double
+        public var weightedMarginPercent: Double
+
         public init(
             output: String = "",
             title: String = "Pakketsamenstelling",
@@ -36,6 +41,10 @@ public enum ProgramExport {
             travelDistanceKm: Double = 0,
             travelRatePerKm: Double = 2.50,
             includePriceInProgram: Bool = true,
+            pricingStrategy: PricingStrategy = .weighted_average,
+            midpointMarginPercent: Double = 15,
+            weightedHighWeightPercent: Double = 65,
+            weightedMarginPercent: Double = 0
         ) {
             self.output = output
             self.title = title
@@ -50,6 +59,10 @@ public enum ProgramExport {
             self.travelDistanceKm = travelDistanceKm
             self.travelRatePerKm = travelRatePerKm
             self.includePriceInProgram = includePriceInProgram
+            self.pricingStrategy = pricingStrategy
+            self.midpointMarginPercent = midpointMarginPercent
+            self.weightedHighWeightPercent = weightedHighWeightPercent
+            self.weightedMarginPercent = weightedMarginPercent
         }
     }
 
@@ -139,22 +152,34 @@ public enum ProgramExport {
 
         let includedPackages = program.map(\.title)
 
-        // Pricing:
-        // - session tally uses the estimate band HIGH
-        // - plus travel: homeSessions * travelDistanceKm * travelRatePerKm
-        let pricedSessionsHigh = sessions.rounded.high
-        let sessionCost = Double(pricedSessionsHigh) * max(0, request.sessionRate)
+        // Pricing (ProgramPricer):
+        // - derives base sessions from band low/high using pricingStrategy
+        // - ceils base sessions for pricing
+        // - adds travel cost
+        // - applies margin as a price markup on subtotal
 
-        let travelCost = Double(max(0, request.homeSessions))
-            * max(0, request.travelDistanceKm)
-            * max(0, request.travelRatePerKm)
+        // let rounded = sessions.rounded
 
-        let totalPrice = sessionCost + travelCost
+        let priced = ProgramPricer.compute(
+            .init(
+                bandLow: max(0, sessions.low),
+                bandHigh: max(0, sessions.high),
+                pricingStrategy: request.pricingStrategy,
+                midpointMarginPercent: request.midpointMarginPercent,
+                weightedHighWeightPercent: request.weightedHighWeightPercent,
+                weightedMarginPercent: request.weightedMarginPercent,
+                sessionRate: request.sessionRate,
+                homeSessions: request.homeSessions,
+                travelDistanceKm: request.travelDistanceKm,
+                travelRatePerKm: request.travelRatePerKm
+            )
+        )
 
         let priceLabel: String? = {
             guard request.includePriceInProgram else { return nil }
-            if pricedSessionsHigh == 0 && request.homeSessions == 0 { return nil }
-            return formatEUR(totalPrice)
+            if priced.sessionsCeiled == 0 && priced.homeSessions == 0 { return nil }
+            // return formatEUR(priced.totalCost)
+            return formatEUR(priced.totalCostRounded)
         }()
 
         return DocDataBox(

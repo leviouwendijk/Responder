@@ -56,6 +56,10 @@ public struct ProgramEditorView: View {
                                 travelDistanceKm: vm.travelDistanceKm,
                                 travelRatePerKm: vm.travelRatePerKm,
                                 includePriceInProgram: vm.includePriceInProgram,
+                                pricingStrategy: vm.pricingStrategy,
+                                midpointMarginPercent: vm.midpointMarginPercent,
+                                weightedHighWeightPercent: vm.weightedHighWeightPercent,
+                                weightedMarginPercent: vm.weightedMarginPercent,
                             )
                         )
 
@@ -146,18 +150,20 @@ private struct PricingBreakdown: View {
                     title: "Weighted",
                     isActive: vm.pricingStrategy == .weighted_average,
                     debug: vm.pricingDebugWeighted,
-                    baseLine: {
-                        let wHigh = max(0, min(100, vm.weightedHighWeightPercent))
-                        let wLow = 100.0 - wHigh
-                        return "base = \(vm.formatNumber2(wLow / 100.0))×low + \(vm.formatNumber2(wHigh / 100.0))×high"
-                    }()
+                    baseLine: vm.pricingDebugWeighted.formulaLine(
+                        strategy: .weighted_average,
+                        weightedHighWeightPercent: vm.weightedHighWeightPercent
+                    )
                 )
 
                 breakdownCard(
                     title: "Midpoint",
                     isActive: vm.pricingStrategy == .midpoint,
                     debug: vm.pricingDebugMidpoint,
-                    baseLine: "base = (low + high) / 2"
+                    baseLine: vm.pricingDebugMidpoint.formulaLine(
+                        strategy: .midpoint,
+                        weightedHighWeightPercent: vm.weightedHighWeightPercent
+                    )
                 )
             }
         }
@@ -184,28 +190,29 @@ private struct PricingBreakdown: View {
             }
 
             Group {
-                line("band", "\(debug.bandLow)–\(debug.bandHigh) sess")
-                line("base", "\(vm.formatNumber2(debug.baseSessions)) sess")
+                line("band", debug.bandLine)
+                line("base", debug.baseLine)
+
                 line("formule", baseLine)
 
                 line("ceil → sessies", "\(debug.sessionsCeiled) sess")
 
                 Divider().padding(.vertical, 2)
 
-                line("sessiekosten",
-                     "\(debug.sessionsCeiled) × \(vm.formatMoney(debug.sessionRate)) = \(vm.formatMoney(debug.sessionCost))")
+                line("sessiekosten", debug.sessionCostLine(formatMoney: vm.formatMoney))
+                line("reis", debug.travelCostLine(formatMoney: vm.formatMoney))
+                line("subtotaal", debug.subtotalLine(formatMoney: vm.formatMoney))
+                line("marge", debug.marginLine)
+                line("markup", debug.markupLine(formatMoney: vm.formatMoney))
+                line("totaal", debug.totalLine(formatMoney: vm.formatMoney))
 
-                line("reis",
-                     "\(debug.homeSessions) × \(vm.formatNumber2(debug.travelDistanceKm)) km × \(vm.formatMoney(debug.travelRatePerKm)) = \(vm.formatMoney(debug.travelCost))")
-
-                line("subtotaal",
-                     "\(vm.formatMoney(debug.sessionCost)) + \(vm.formatMoney(debug.travelCost)) = \(vm.formatMoney(debug.subtotal))")
-
-                line("marge", "\(vm.formatNumber2(debug.marginPercent))%")
-                line("markup", "\(vm.formatMoney(debug.markupAmount))")
-
-                line("totaal",
-                     "\(vm.formatMoney(debug.subtotal)) + \(vm.formatMoney(debug.markupAmount)) = \(vm.formatMoney(debug.totalCost))")
+                line(
+                    "afronden",
+                    debug.roundedTotalLine(
+                        toNearest: vm.priceRoundingStep,
+                        formatMoney: vm.formatMoney
+                    )
+                )
             }
             .font(.caption)
             .monospacedDigit()
@@ -443,9 +450,16 @@ public struct PackageListView: View {
 
                             Spacer()
 
-                            Text(vm.estimatedTotalCostLabel)
-                                .font(.subheadline)
-                                .monospacedDigit()
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text(vm.estimatedTotalCostLabel)
+                                    .font(.subheadline)
+                                    .monospacedDigit()
+
+                                Text(vm.estimatedTotalCostRoundedLine)
+                                    .font(.caption)
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                     .disabled(!vm.includePriceInProgram)

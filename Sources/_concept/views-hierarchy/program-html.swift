@@ -37,25 +37,44 @@ public struct DocDataBox: Sendable {
             docDataLine(label: "Hond:", value: dogName),
         ]
 
-        if let sessions = estimatedSessions {
+        let sessionsLabel: String? = estimatedSessions.map { sessions in
+            "\(sessions.low)–\(sessions.high)"
+        }
+
+        let spreadLabel: String? = estimateBand.map { band in
+            band.dotString(filled: band.dot_spread_count)
+        }
+
+        let sessionsLabelWithSpread: String? = {
+            guard let sessionsLabel else { return nil }
+
+            guard let spreadLabel, !spreadLabel.isEmpty else {
+                return sessionsLabel
+            }
+
+            return "\(sessionsLabel)"
+            // return "\(sessionsLabel) (\(spreadLabel))"
+        }()
+
+        if let sessionsLabelWithSpread {
             contentNodes.append(
                 docDataLine(
                     label: "Sessies:",
-                    value: "\(sessions.low)–\(sessions.high)"
+                    value: sessionsLabelWithSpread
                 )
             )
         }
 
-        if let band = estimateBand {
-            let dots = band.dotString(filled: band.dot_spread_count)
-            contentNodes.append(
-                docDataLine(
-                    label: "Programma-spreiding:",
-                    // value: "\(dots)  \(band.publicDetails)"
-                    value: "\(dots)"
-                )
-            )
-        }
+        // NOTE: removed the separate Programma-spreiding line
+        // if let band = estimateBand {
+        //     let dots = band.dotString(filled: band.dot_spread_count)
+        //     contentNodes.append(
+        //         docDataLine(
+        //             label: "Programma-spreiding:",
+        //             value: "\(dots)"
+        //         )
+        //     )
+        // }
 
         if let packages = includedPackages, !packages.isEmpty {
             let titleLabel = "Pakketsamenstelling:"
@@ -175,9 +194,9 @@ public enum ProgramHTML {
     }
 
     private static func renderProgramBanner(band: ProgramTally.EstimateBand?) -> any HTMLNode {
-        // let dots: String? = band.map { b in
-        //     b.dotString(filled: b.dot_spread_count)
-        // }
+        let dots: String? = band.map { b in
+            b.dotString(filled: b.dot_spread_count)
+        }
 
         return HTML.div(["class": "ph-program-banner__inner"]) {
             HTML.div(["class": "ph-program-banner__top"]) {
@@ -187,16 +206,16 @@ public enum ProgramHTML {
                     HTML.text("Over dit programma")
                 }
 
-                // if let dots {
-                //     HTML.div(["class": "ph-program-banner__dots"]) {
-                //         // HTML.span(["class": "ph-program-banner__dots-label"]) {
-                //         //     HTML.text("spreiding")
-                //         // }
-                //         HTML.span(["class": "ph-program-banner__dots-value"]) {
-                //             HTML.text(dots)
-                //         }
-                //     }
-                // }
+                if let dots {
+                    HTML.div(["class": "ph-program-banner__dots"]) {
+                        // HTML.span(["class": "ph-program-banner__dots-label"]) {
+                        //     HTML.text("spreiding")
+                        // }
+                        HTML.span(["class": "ph-program-banner__dots-value"]) {
+                            HTML.text(dots)
+                        }
+                    }
+                }
             }
 
             HTML.p(["class": "ph-program-banner__body"]) {
@@ -1077,5 +1096,82 @@ public enum ProgramHTMLStyles {
                 CSS.decl("page-break-inside", "avoid")
             )
         )
+
+        CSS.media(
+            "print",
+
+            // --- WeasyPrint layout stability (avoid flex fragmentation/overlap) ---
+
+            // 1) Kill flex stacking inside component rows (gap -> margins)
+            CSS.rule(
+                ".ph-component-main",
+                CSS.decl("display", "block")
+            ),
+            CSS.rule(
+                ".ph-component-main > * + *",
+                CSS.decl("margin-top", "6px")
+            ),
+
+            // 2) Kill flex column lists in print (critical: fixes exchangeable box height/overlap)
+            CSS.rule(
+                ".ph-component-list",
+                CSS.decl("display", "block")
+            ),
+            CSS.rule(
+                ".ph-component-list--exchangeable",
+                CSS.decl("display", "block")
+            ),
+            CSS.rule(
+                ".ph-exchangeable-box",
+                CSS.decl("display", "block")
+            ),
+
+            // 3) Chips: render as simple inline blocks in print
+            CSS.rule(
+                ".ph-component-chips",
+                CSS.decl("display", "block")
+            ),
+            CSS.rule(
+                ".ph-chip",
+                CSS.decl("display", "inline-block"),
+                CSS.decl("margin", "0 6px 6px 0")
+            ),
+
+            // 4) Pagination rules for exchangeables
+            CSS.rule(
+                ".ph-exchangeable-box",
+                CSS.decl("break-inside", "auto"),
+                CSS.decl("page-break-inside", "auto")
+            ),
+            CSS.rule(
+                ".ph-exchangeable-title",
+                CSS.decl("break-after", "avoid"),
+                CSS.decl("page-break-after", "avoid")
+            ),
+            CSS.rule(
+                ".ph-component-list--exchangeable .ph-component-row",
+                CSS.decl("break-inside", "avoid"),
+                CSS.decl("page-break-inside", "avoid")
+            ),
+
+            // 5) Docdata: avoid flex overlap in print by switching to grid
+            CSS.rule(
+                ".ph-docdata-line",
+                CSS.decl("display", "grid"),
+                CSS.decl("grid-template-columns", "140px 1fr"),
+                CSS.decl("column-gap", "10px"),
+                CSS.decl("align-items", "start")
+            ),
+            CSS.rule(
+                ".ph-docdata-label",
+                CSS.decl("white-space", "nowrap")
+            ),
+            CSS.rule(
+                ".ph-docdata-value",
+                CSS.decl("min-width", "0"),
+                CSS.decl("word-break", "break-word")
+            )
+        )
+
     }
 }
