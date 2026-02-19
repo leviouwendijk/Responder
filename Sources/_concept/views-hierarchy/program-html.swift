@@ -271,7 +271,7 @@ public enum ProgramHTML {
 
                 HTML.div(["class": "ph-package-body"]) {
                     for m in pkg.modules {
-                        renderModule(m)
+                        renderModule(m, skip_if_empty: true)
                     }
                 }
             }
@@ -294,7 +294,13 @@ public enum ProgramHTML {
     //     return nodes
     // }
 
-    private static func renderModule(_ module: Module) -> HTMLFragment {
+    private static func renderModule(_ module: Module, skip_if_empty: Bool = false) -> HTMLFragment {
+        if skip_if_empty {
+            guard module.entries.contains(where: { $0.include }) else {
+                return []
+            }
+        }
+
         let header: String = module.title ?? "Module"
 
         return [

@@ -45,7 +45,9 @@ public enum PrebuiltPackage {
             PrebuiltModules.preparation(),
             PrebuiltModules.communication(),
             PrebuiltModules.motivation(),
-            PrebuiltModules.engagement()
+            PrebuiltModules.pressure(),
+            PrebuiltModules.shaping(),
+            PrebuiltModules.engagement(),
         ]
     )
 

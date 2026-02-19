@@ -28,12 +28,19 @@ public struct ProgramEditorView: View {
 
     // Dog name editing is in this view (subtle; no new sidebar sections)
     @State private var showDogNameEditor = false
+    // Client name editing (manual override when contact isn't used / isn't found)
+    @State private var showClientNameEditor = false
 
     public init() {}
 
     public var body: some View {
         NavigationSplitView {
-            PackageListView(vm: vm)
+            // PackageListView(vm: vm)
+            PackageListView(
+                vm: vm,
+                contactLabel: sidebarContactLabel(),
+                dogLabel: sidebarDogLabel()
+            )
         } detail: {
             if let index = vm.selectedPackageIndex {
                 PackageEditorView(package: $vm.program[index])
@@ -124,6 +131,9 @@ public struct ProgramEditorView: View {
         .sheet(isPresented: $showContactPicker) {
             contactPickerSheet()
         }
+        .sheet(isPresented: $showClientNameEditor) {
+            clientNameEditorSheet()
+        }
         .sheet(isPresented: $showDogNameEditor) {
             dogNameEditorSheet()
         }
@@ -133,22 +143,41 @@ public struct ProgramEditorView: View {
 
     @ViewBuilder
     private func contactToolbarItems() -> some View {
+        // Contacts picker
         Button {
             showContactPicker = true
         } label: {
-            Image(systemName: selectedContact == nil ? "person" : "person.fill")
+            Image(systemName: selectedContact == nil
+                ? "person.text.rectangle"
+                : "person.text.rectangle.fill"
+            )
         }
         .help(selectedContact == nil ? "Selecteer contact" : "Wijzig contact")
 
+        // Manual override (client name)
+        Button {
+            showClientNameEditor = true
+        } label: {
+            let hasName = !(clientName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Image(systemName: hasName
+                ? "person.crop.circle.badge.checkmark"
+                : "person.crop.circle.badge.plus"
+            )
+        }
+        .help("Zet clientnaam")
+
         if selectedContact != nil {
-            Button {
-                clearSelectedContact()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .imageScale(.medium)
+            Button { clearSelectedContact() } label: {
+                Image(systemName: "xmark.circle.fill").imageScale(.medium)
             }
             .buttonStyle(.plain)
             .help("Wis contact")
+        } else if !(clientName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+            Button { clientName = "" } label: {
+                Image(systemName: "xmark.circle.fill").imageScale(.medium)
+            }
+            .buttonStyle(.plain)
+            .help("Wis clientnaam")
         }
     }
 
@@ -184,6 +213,45 @@ public struct ProgramEditorView: View {
                 }
             }
             .frame(minWidth: 640, minHeight: 640)
+        }
+    }
+
+    private func clientNameEditorSheet() -> some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Client")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    TextField("Clientnaam", text: $clientName)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                Text("dev note: dit is los van Contacts. Later kunnen we dit koppelen aan gedeelde state.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .navigationTitle("Clientnaam")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Sluit") {
+                        showClientNameEditor = false
+                    }
+                }
+
+                if !(clientName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Wis") {
+                            clientName = ""
+                        }
+                    }
+                }
+            }
+            .frame(minWidth: 420, minHeight: 220)
         }
     }
 
@@ -305,6 +373,19 @@ public struct ProgramEditorView: View {
     private func effectiveDogName() -> String {
         let s = dogName.trimmingCharacters(in: .whitespacesAndNewlines)
         return s.isEmpty ? "—" : s
+    }
+
+    private func sidebarContactLabel() -> String {
+        if let c = selectedContact {
+            let name = contactDisplayName(c).trimmingCharacters(in: .whitespacesAndNewlines)
+            return name.isEmpty || name == "—" ? "—" : name
+        }
+        return "—"
+    }
+
+    private func sidebarDogLabel() -> String {
+        let s = effectiveDogName().trimmingCharacters(in: .whitespacesAndNewlines)
+        return s.isEmpty || s == "—" ? "—" : s
     }
 
     // SPLITTING HELPERS FOR NOW
@@ -496,17 +577,36 @@ private struct PricingBreakdown: View {
 
 public struct PackageListView: View {
     @ObservedObject public var vm: ProgramEditorViewModel
+    
+    public let contactLabel: String
+    public let dogLabel: String
 
-    public init(vm: ProgramEditorViewModel) {
+    public init(
+        vm: ProgramEditorViewModel,
+        contactLabel: String,
+        dogLabel: String
+    ) {
         self.vm = vm
+        self.contactLabel = contactLabel
+        self.dogLabel = dogLabel
     }
+
+    // public init(vm: ProgramEditorViewModel) {
+    //     self.vm = vm
+    // }
 
     public var body: some View {
         List(selection: $vm.selectedPackageID) {
-
             Section {
                 VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        sidebarIdentityLine(label: "Contact", value: contactLabel)
+                        sidebarIdentityLine(label: "Dog", value: dogLabel)
+                    }
+                    .padding(.bottom, 4)
+
                     HStack(alignment: .firstTextBaseline) {
+
                         Text("Sessies (schatting)")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -901,6 +1001,21 @@ public struct PackageListView: View {
         guard idx + 1 < vm.program.count else { return }
         withAnimation {
             vm.program.swapAt(idx, idx + 1)
+        }
+    }
+
+    @ViewBuilder
+    private func sidebarIdentityLine(label: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text("\(label):")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Text(value == "—" ? "<none>" : value)
+                .font(.subheadline)
+                .monospacedDigit()
         }
     }
 }

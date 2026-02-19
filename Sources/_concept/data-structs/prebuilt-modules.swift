@@ -96,8 +96,8 @@ public enum PrebuiltModules {
         Module(
             title: "Drukwerk: vorming, sturing, management",
             entries: [
-                .init(component: PrebuiltModuleComponents.Pressure.leash_habituation_opposition_reflex, placement: .exchangeable),
-                .init(component: PrebuiltModuleComponents.Pressure.body_spatial_pressure, placement: .exchangeable),
+                .init(component: PrebuiltModuleComponents.Pressure.leash_habituation_opposition_reflex, placement: .elementary, include: false),
+                .init(component: PrebuiltModuleComponents.Pressure.body_spatial_pressure, placement: .exchangeable, include: false),
             ]
         )
     }
@@ -106,7 +106,7 @@ public enum PrebuiltModules {
         Module(
             title: "Vorming gedragskaders (gehoorzaamheid, toegepaste gedragssignalen)",
             entries: [
-                .init(component: PrebuiltModuleComponents.Shaping.assisted_shaping_obedience, placement: .elementary),
+                .init(component: PrebuiltModuleComponents.Shaping.assisted_shaping_obedience, placement: .exchangeable, include: false),
             ]
         )
     }

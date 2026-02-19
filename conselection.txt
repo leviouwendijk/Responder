@@ -579,7 +579,9 @@ public enum PrebuiltPackage {
             PrebuiltModules.preparation(),
             PrebuiltModules.communication(),
             PrebuiltModules.motivation(),
-            PrebuiltModules.engagement()
+            PrebuiltModules.pressure(),
+            PrebuiltModules.shaping(),
+            PrebuiltModules.engagement(),
         ]
     )
 
@@ -1363,8 +1365,8 @@ public enum PrebuiltModules {
         Module(
             title: "Drukwerk: vorming, sturing, management",
             entries: [
-                .init(component: PrebuiltModuleComponents.Pressure.leash_habituation_opposition_reflex, placement: .exchangeable),
-                .init(component: PrebuiltModuleComponents.Pressure.body_spatial_pressure, placement: .exchangeable),
+                .init(component: PrebuiltModuleComponents.Pressure.leash_habituation_opposition_reflex, placement: .elementary, include: false),
+                .init(component: PrebuiltModuleComponents.Pressure.body_spatial_pressure, placement: .exchangeable, include: false),
             ]
         )
     }
@@ -1373,7 +1375,7 @@ public enum PrebuiltModules {
         Module(
             title: "Vorming gedragskaders (gehoorzaamheid, toegepaste gedragssignalen)",
             entries: [
-                .init(component: PrebuiltModuleComponents.Shaping.assisted_shaping_obedience, placement: .elementary),
+                .init(component: PrebuiltModuleComponents.Shaping.assisted_shaping_obedience, placement: .exchangeable, include: false),
             ]
         )
     }
@@ -2260,7 +2262,7 @@ public enum ProgramHTML {
 
                 HTML.div(["class": "ph-package-body"]) {
                     for m in pkg.modules {
-                        renderModule(m)
+                        renderModule(m, skip_if_empty: true)
                     }
                 }
             }
@@ -2283,7 +2285,13 @@ public enum ProgramHTML {
     //     return nodes
     // }
 
-    private static func renderModule(_ module: Module) -> HTMLFragment {
+    private static func renderModule(_ module: Module, skip_if_empty: Bool = false) -> HTMLFragment {
+        if skip_if_empty {
+            guard module.entries.contains(where: { $0.include }) else {
+                return []
+            }
+        }
+
         let header: String = module.title ?? "Module"
 
         return [
@@ -3869,6 +3877,8 @@ public struct ProgramEditorView: View {
 
     // Dog name editing is in this view (subtle; no new sidebar sections)
     @State private var showDogNameEditor = false
+    // Client name editing (manual override when contact isn't used / isn't found)
+    @State private var showClientNameEditor = false
 
     public init() {}
 
@@ -3965,6 +3975,9 @@ public struct ProgramEditorView: View {
         .sheet(isPresented: $showContactPicker) {
             contactPickerSheet()
         }
+        .sheet(isPresented: $showClientNameEditor) {
+            clientNameEditorSheet()
+        }
         .sheet(isPresented: $showDogNameEditor) {
             dogNameEditorSheet()
         }
@@ -3974,22 +3987,41 @@ public struct ProgramEditorView: View {
 
     @ViewBuilder
     private func contactToolbarItems() -> some View {
+        // Contacts picker
         Button {
             showContactPicker = true
         } label: {
-            Image(systemName: selectedContact == nil ? "person" : "person.fill")
+            Image(systemName: selectedContact == nil
+                ? "person.text.rectangle"
+                : "person.text.rectangle.fill"
+            )
         }
         .help(selectedContact == nil ? "Selecteer contact" : "Wijzig contact")
 
+        // Manual override (client name)
+        Button {
+            showClientNameEditor = true
+        } label: {
+            let hasName = !(clientName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Image(systemName: hasName
+                ? "person.crop.circle.badge.checkmark"
+                : "person.crop.circle.badge.plus"
+            )
+        }
+        .help("Zet clientnaam")
+
         if selectedContact != nil {
-            Button {
-                clearSelectedContact()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .imageScale(.medium)
+            Button { clearSelectedContact() } label: {
+                Image(systemName: "xmark.circle.fill").imageScale(.medium)
             }
             .buttonStyle(.plain)
             .help("Wis contact")
+        } else if !(clientName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+            Button { clientName = "" } label: {
+                Image(systemName: "xmark.circle.fill").imageScale(.medium)
+            }
+            .buttonStyle(.plain)
+            .help("Wis clientnaam")
         }
     }
 
@@ -4025,6 +4057,45 @@ public struct ProgramEditorView: View {
                 }
             }
             .frame(minWidth: 640, minHeight: 640)
+        }
+    }
+
+    private func clientNameEditorSheet() -> some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Client")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    TextField("Clientnaam", text: $clientName)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                Text("dev note: dit is los van Contacts. Later kunnen we dit koppelen aan gedeelde state.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .navigationTitle("Clientnaam")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Sluit") {
+                        showClientNameEditor = false
+                    }
+                }
+
+                if !(clientName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Wis") {
+                            clientName = ""
+                        }
+                    }
+                }
+            }
+            .frame(minWidth: 420, minHeight: 220)
         }
     }
 
@@ -4092,35 +4163,51 @@ public struct ProgramEditorView: View {
 
     // Selection → identity mapping (still isolated here)
 
+//     private func applySelectedContact(_ contact: CNContact) {
+//         selectedContact = contact
+
+//         let display = contactDisplayName(contact)
+//         if !display.isEmpty {
+//             clientName = display
+//         } else {
+//             clientName = ""
+//         }
+//     }
+
     private func applySelectedContact(_ contact: CNContact) {
         selectedContact = contact
 
-        let display = contactDisplayName(contact)
-        if !display.isEmpty {
-            clientName = display
-        } else {
-            clientName = ""
-        }
+        let parsed = parseContactIdentity(contact)
+
+        clientName = parsed.client
+        dogName = parsed.dog ?? ""
     }
 
     private func clearSelectedContact() {
         selectedContact = nil
         clientName = ""
+        dogName = ""
     }
 
     private func contactDisplayName(_ c: CNContact) -> String {
-        let g = c.givenName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let f = c.familyName.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        let name = [g, f].filter { !$0.isEmpty }.joined(separator: " ")
-        if !name.isEmpty { return name }
-
-        if let email = c.emailAddresses.first?.value as String?, !email.isEmpty {
-            return email
-        }
-
-        return ""
+        let parsed = parseContactIdentity(c)
+        return parsed.client.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "—" : parsed.client
     }
+
+    // private func contactDisplayName(_ c: CNContact) -> String {
+    //     let g = c.givenName.trimmingCharacters(in: .whitespacesAndNewlines)
+    //     let f = c.familyName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    //     let name = [g, f].filter { !$0.isEmpty }.joined(separator: " ")
+    //     if !name.isEmpty { return name }
+
+    //     if let email = c.emailAddresses.first?.value as String?, !email.isEmpty {
+    //         return email
+    //     }
+
+    //     return ""
+    // }
 
     private func effectiveClientName() -> String {
         let s = clientName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -4130,6 +4217,58 @@ public struct ProgramEditorView: View {
     private func effectiveDogName() -> String {
         let s = dogName.trimmingCharacters(in: .whitespacesAndNewlines)
         return s.isEmpty ? "—" : s
+    }
+
+    // SPLITTING HELPERS FOR NOW
+    private func parseContactIdentity(_ c: CNContact) -> (client: String, dog: String?) {
+        let given = c.givenName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let family = c.familyName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Your convention: "<PERSON> | <DOG>" stored in givenName
+        if let (left, right) = splitPipe(given) {
+            let client = joinName(left, family)
+            let dog = right.trimmingCharacters(in: .whitespacesAndNewlines)
+            return (client: client.isEmpty ? fallbackClientName(c) : client,
+                    dog: dog.isEmpty ? nil : dog)
+        }
+
+        // No pipe: normal contact name, and dog is unknown (defaults to "—" via effectiveDogName()).
+        let client = fallbackClientName(c)
+        return (client: client, dog: nil)
+    }
+
+    private func splitPipe(_ s: String) -> (left: String, right: String)? {
+        // Only accept if we have a non-empty left side.
+        let parts = s.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+        guard parts.count == 2 else { return nil }
+
+        let left = String(parts[0]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let right = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !left.isEmpty else { return nil }
+        return (left, right)
+    }
+
+    private func joinName(_ given: String, _ family: String) -> String {
+        if family.isEmpty { return given }
+        if given.isEmpty { return family }
+        return "\(given) \(family)"
+    }
+
+    private func fallbackClientName(_ c: CNContact) -> String {
+        let given = c.givenName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let family = c.familyName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let full = joinName(given, family).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !full.isEmpty { return full }
+
+        // Optional: email fallback if you want it
+        if let email = c.emailAddresses.first?.value as String? {
+            let e = email.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !e.isEmpty { return e }
+        }
+
+        return "—"
     }
 }
 
