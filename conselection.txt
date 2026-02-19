@@ -3884,7 +3884,12 @@ public struct ProgramEditorView: View {
 
     public var body: some View {
         NavigationSplitView {
-            PackageListView(vm: vm)
+            // PackageListView(vm: vm)
+            PackageListView(
+                vm: vm,
+                contactLabel: sidebarContactLabel(),
+                dogLabel: sidebarDogLabel()
+            )
         } detail: {
             if let index = vm.selectedPackageIndex {
                 PackageEditorView(package: $vm.program[index])
@@ -4219,6 +4224,19 @@ public struct ProgramEditorView: View {
         return s.isEmpty ? "—" : s
     }
 
+    private func sidebarContactLabel() -> String {
+        if let c = selectedContact {
+            let name = contactDisplayName(c).trimmingCharacters(in: .whitespacesAndNewlines)
+            return name.isEmpty || name == "—" ? "—" : name
+        }
+        return "—"
+    }
+
+    private func sidebarDogLabel() -> String {
+        let s = effectiveDogName().trimmingCharacters(in: .whitespacesAndNewlines)
+        return s.isEmpty || s == "—" ? "—" : s
+    }
+
     // SPLITTING HELPERS FOR NOW
     private func parseContactIdentity(_ c: CNContact) -> (client: String, dog: String?) {
         let given = c.givenName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -4408,17 +4426,36 @@ private struct PricingBreakdown: View {
 
 public struct PackageListView: View {
     @ObservedObject public var vm: ProgramEditorViewModel
+    
+    public let contactLabel: String
+    public let dogLabel: String
 
-    public init(vm: ProgramEditorViewModel) {
+    public init(
+        vm: ProgramEditorViewModel,
+        contactLabel: String,
+        dogLabel: String
+    ) {
         self.vm = vm
+        self.contactLabel = contactLabel
+        self.dogLabel = dogLabel
     }
+
+    // public init(vm: ProgramEditorViewModel) {
+    //     self.vm = vm
+    // }
 
     public var body: some View {
         List(selection: $vm.selectedPackageID) {
-
             Section {
                 VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        sidebarIdentityLine(label: "Contact", value: contactLabel)
+                        sidebarIdentityLine(label: "Dog", value: dogLabel)
+                    }
+                    .padding(.bottom, 4)
+
                     HStack(alignment: .firstTextBaseline) {
+
                         Text("Sessies (schatting)")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -4813,6 +4850,21 @@ public struct PackageListView: View {
         guard idx + 1 < vm.program.count else { return }
         withAnimation {
             vm.program.swapAt(idx, idx + 1)
+        }
+    }
+
+    @ViewBuilder
+    private func sidebarIdentityLine(label: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text("\(label):")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Text(value == "—" ? "<none>" : value)
+                .font(.subheadline)
+                .monospacedDigit()
         }
     }
 }
