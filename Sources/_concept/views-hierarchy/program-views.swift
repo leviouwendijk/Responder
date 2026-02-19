@@ -1763,7 +1763,9 @@ public struct ModuleEntrySummaryRow: View {
                 .help("Bewerk")
             }
         }
-        .padding(.vertical, 2)
+        // .padding(.vertical, 2)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
     }
 
     private func allocationLine(sessionDuration: Int = 60) -> String? {

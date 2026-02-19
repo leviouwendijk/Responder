@@ -4956,6 +4956,67 @@ public struct PackageEditorView: View {
         self._package = package
     }
 
+    // public var body: some View {
+    //     VStack(alignment: .leading, spacing: 12) {
+    //         HStack(spacing: 12) {
+    //             TextField("Pakket titel", text: $package.title)
+    //                 .textFieldStyle(.roundedBorder)
+    //                 .font(.title3)
+
+    //             Spacer()
+
+    //             Button {
+    //                 withAnimation {
+    //                     package.modules.append(Module(entries: []))
+    //                 }
+    //             } label: {
+    //                 Label("Nieuw module", systemImage: "plus")
+    //             }
+    //             .buttonStyle(.bordered)
+    //         }
+    //         .padding(.horizontal)
+    //         .padding(.top, 8)
+
+    //         VStack(alignment: .leading, spacing: 16) {
+    //             ForEach($package.modules) { $m in
+    //                 let id = m.id
+    //                 let idx = package.modules.firstIndex(where: { $0.id == id }) ?? 0
+
+    //                 ModuleBoxView(
+    //                     moduleIndex: idx,
+    //                     moduleCount: package.modules.count,
+    //                     module: $m,
+    //                     onDeleteModule: {
+    //                         guard let i = package.modules.firstIndex(where: { $0.id == id }) else { return }
+    //                         _ = withAnimation {
+    //                             package.modules.remove(at: i)
+    //                         }
+    //                     },
+    //                     onMoveUp: {
+    //                         guard let i = package.modules.firstIndex(where: { $0.id == id }) else { return }
+    //                         guard i > 0 else { return }
+    //                         withAnimation {
+    //                             package.modules.swapAt(i, i - 1)
+    //                         }
+    //                     },
+    //                     onMoveDown: {
+    //                         guard let i = package.modules.firstIndex(where: { $0.id == id }) else { return }
+    //                         guard i + 1 < package.modules.count else { return }
+    //                         withAnimation {
+    //                             package.modules.swapAt(i, i + 1)
+    //                         }
+    //                     }
+    //                 )
+    //                 .padding(.horizontal)
+    //             }
+    //         }
+    //         .padding(.vertical, 8)
+
+    //         Spacer(minLength: 0)
+    //     }
+    //     .navigationTitle(package.title)
+    // }
+
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
@@ -4977,190 +5038,52 @@ public struct PackageEditorView: View {
             .padding(.horizontal)
             .padding(.top, 8)
 
-            VStack(alignment: .leading, spacing: 16) {
-                ForEach($package.modules) { $m in
-                    let id = m.id
-                    let idx = package.modules.firstIndex(where: { $0.id == id }) ?? 0
+            Divider()
+                .padding(.horizontal)
 
-                    ModuleBoxView(
-                        moduleIndex: idx,
-                        moduleCount: package.modules.count,
-                        module: $m,
-                        onDeleteModule: {
-                            guard let i = package.modules.firstIndex(where: { $0.id == id }) else { return }
-                            _ = withAnimation {
-                                package.modules.remove(at: i)
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach($package.modules) { $m in
+                        let id = m.id
+                        let idx = package.modules.firstIndex(where: { $0.id == id }) ?? 0
+
+                        ModuleBoxView(
+                            moduleIndex: idx,
+                            moduleCount: package.modules.count,
+                            module: $m,
+                            onDeleteModule: {
+                                guard let i = package.modules.firstIndex(where: { $0.id == id }) else { return }
+                                _ = withAnimation {
+                                    package.modules.remove(at: i)
+                                }
+                            },
+                            onMoveUp: {
+                                guard let i = package.modules.firstIndex(where: { $0.id == id }) else { return }
+                                guard i > 0 else { return }
+                                withAnimation {
+                                    package.modules.swapAt(i, i - 1)
+                                }
+                            },
+                            onMoveDown: {
+                                guard let i = package.modules.firstIndex(where: { $0.id == id }) else { return }
+                                guard i + 1 < package.modules.count else { return }
+                                withAnimation {
+                                    package.modules.swapAt(i, i + 1)
+                                }
                             }
-                        },
-                        onMoveUp: {
-                            guard let i = package.modules.firstIndex(where: { $0.id == id }) else { return }
-                            guard i > 0 else { return }
-                            withAnimation {
-                                package.modules.swapAt(i, i - 1)
-                            }
-                        },
-                        onMoveDown: {
-                            guard let i = package.modules.firstIndex(where: { $0.id == id }) else { return }
-                            guard i + 1 < package.modules.count else { return }
-                            withAnimation {
-                                package.modules.swapAt(i, i + 1)
-                            }
-                        }
-                    )
-                    .padding(.horizontal)
+                        )
+                    }
                 }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
             }
-            .padding(.vertical, 8)
-
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity)
+            .frame(maxHeight: .infinity)
         }
         .navigationTitle(package.title)
     }
 }
 
-// public struct ModuleBoxView: View {
-//     public let moduleIndex: Int
-//     public let moduleCount: Int
-
-//     @Binding public var module: Module
-
-//     public let onDeleteModule: () -> Void
-//     public let onMoveUp: () -> Void
-//     public let onMoveDown: () -> Void
-
-//     @State private var editTargetID: ModuleEntry.ID?
-
-//     public init(
-//         moduleIndex: Int,
-//         moduleCount: Int,
-//         module: Binding<Module>,
-//         onDeleteModule: @escaping () -> Void,
-//         onMoveUp: @escaping () -> Void,
-//         onMoveDown: @escaping () -> Void
-//     ) {
-//         self.moduleIndex = moduleIndex
-//         self.moduleCount = moduleCount
-//         self._module = module
-//         self.onDeleteModule = onDeleteModule
-//         self.onMoveUp = onMoveUp
-//         self.onMoveDown = onMoveDown
-//     }
-
-//     public var body: some View {
-//         VStack(alignment: .leading, spacing: 12) {
-//             HStack(spacing: 10) {
-//                 TextField(
-//                     "Module \(moduleIndex + 1)",
-//                     text: Binding(
-//                         get: { module.title ?? "" },
-//                         set: { module.title = $0.isEmpty ? nil : $0 }
-//                     )
-//                 )
-//                 .textFieldStyle(.plain)
-//                 .font(.headline)
-//                 .frame(minWidth: 220)
-//                 .layoutPriority(1)
-
-//                 Spacer(minLength: 8)
-
-//                 HStack(spacing: 8) {
-//                     Button { onMoveUp() } label: {
-//                         Image(systemName: "chevron.up")
-//                             .imageScale(.medium)
-//                     }
-//                     .buttonStyle(.bordered)
-//                     .frame(width: 36)
-//                     .disabled(moduleIndex == 0)
-//                     .help("Module omhoog")
-
-//                     Button { onMoveDown() } label: {
-//                         Image(systemName: "chevron.down")
-//                             .imageScale(.medium)
-//                     }
-//                     .buttonStyle(.bordered)
-//                     .frame(width: 36)
-//                     .disabled(moduleIndex + 1 >= moduleCount)
-//                     .help("Module omlaag")
-
-//                     Button { onDeleteModule() } label: {
-//                         Image(systemName: "trash")
-//                             .imageScale(.medium)
-//                     }
-//                     .buttonStyle(.borderedProminent)
-//                     .frame(width: 36)
-//                     .help("Verwijder module")
-
-//                     Button {
-//                         withAnimation {
-//                             module.entries.append(
-//                                 ModuleEntry(
-//                                     component: .empty(),
-//                                     placement: .exchangeable,
-//                                     include: true
-//                                 )
-//                             )
-//                         }
-//                     } label: {
-//                         Image(systemName: "plus")
-//                             .imageScale(.medium)
-//                     }
-//                     .buttonStyle(.bordered)
-//                     .frame(width: 36)
-//                     .help("Nieuw item")
-//                 }
-//                 .controlSize(.regular)
-//             }
-
-//             Divider()
-
-//             List {
-//                 ForEach($module.entries, id: \.id) { $entry in
-//                     ModuleEntrySummaryRow(
-//                         entry: $entry,
-//                         onEdit: {
-//                             editTargetID = entry.id
-//                         },
-//                         onDelete: {
-//                             if let i = module.entries.firstIndex(where: { $0.id == entry.id }) {
-//                                 _ = withAnimation {
-//                                     module.entries.remove(at: i)
-//                                 }
-//                             }
-//                         }
-//                     )
-//                 }
-//                 .onMove { from, to in
-//                     withAnimation {
-//                         module.entries.move(fromOffsets: from, toOffset: to)
-//                     }
-//                 }
-//                 .onDelete { offsets in
-//                     withAnimation {
-//                         module.entries.remove(atOffsets: offsets)
-//                     }
-//                 }
-//             }
-//             .listStyle(.plain)
-//             .frame(minHeight: 120)
-//             .frame(maxWidth: .infinity)
-//         }
-//         .padding(12)
-//         .background(.regularMaterial)
-//         .clipShape(RoundedRectangle(cornerRadius: 12))
-//         .sheet(isPresented: Binding(
-//             get: { editTargetID != nil },
-//             set: { if !$0 { editTargetID = nil } }
-//         )) {
-//             if let id = editTargetID,
-//                let index = module.entries.firstIndex(where: { $0.id == id }) {
-//                 ModuleEntryEditSheet(entry: $module.entries[index])
-//             } else {
-//                 Text("Geen item geselecteerd")
-//                     .padding(20)
-//             }
-//         }
-//     }
-// }
 public struct ModuleBoxView: View {
     public let moduleIndex: Int
     public let moduleCount: Int
@@ -5259,56 +5182,156 @@ public struct ModuleBoxView: View {
 
             Divider()
 
-            List {
-                Section("Standaard") {
-                    ForEach(split.elementaryIndices, id: \.self) { i in
-                        ModuleEntrySummaryRow(
-                            entry: $module.entries[i],
-                            onEdit: {
-                                editTargetID = module.entries[i].id
-                            },
-                            onDelete: {
-                                deleteEntryByIndex(i)
-                            }
-                        )
-                        .onChange(of: module.entries[i].placement) { _, _  in
-                            normalizeEntriesOrderIfNeeded(animated: true)
-                        }
-                    }
-                    .onMove { from, to in
-                        moveWithinElementary(from: from, to: to)
-                    }
-                    .onDelete { offsets in
-                        deleteByOffsets(offsets, in: split.elementaryIndices)
-                    }
-                }
+            // List {
+            //     Section("Standaard") {
+            //         ForEach(split.elementaryIndices, id: \.self) { i in
+            //             ModuleEntrySummaryRow(
+            //                 entry: $module.entries[i],
+            //                 onEdit: {
+            //                     editTargetID = module.entries[i].id
+            //                 },
+            //                 onDelete: {
+            //                     deleteEntryByIndex(i)
+            //                 }
+            //             )
+            //             .onChange(of: module.entries[i].placement) { _, _  in
+            //                 normalizeEntriesOrderIfNeeded(animated: true)
+            //             }
+            //         }
+            //         .onMove { from, to in
+            //             moveWithinElementary(from: from, to: to)
+            //         }
+            //         .onDelete { offsets in
+            //             deleteByOffsets(offsets, in: split.elementaryIndices)
+            //         }
+            //     }
 
-                Section("Inwisselbaar") {
-                    ForEach(split.exchangeableIndices, id: \.self) { i in
-                        ModuleEntrySummaryRow(
-                            entry: $module.entries[i],
-                            onEdit: {
-                                editTargetID = module.entries[i].id
-                            },
-                            onDelete: {
-                                deleteEntryByIndex(i)
+            //     Section("Inwisselbaar") {
+            //         ForEach(split.exchangeableIndices, id: \.self) { i in
+            //             ModuleEntrySummaryRow(
+            //                 entry: $module.entries[i],
+            //                 onEdit: {
+            //                     editTargetID = module.entries[i].id
+            //                 },
+            //                 onDelete: {
+            //                     deleteEntryByIndex(i)
+            //                 }
+            //             )
+            //             .onChange(of: module.entries[i].placement) { _, _ in
+            //                 normalizeEntriesOrderIfNeeded(animated: true)
+            //             }
+            //         }
+            //         .onMove { from, to in
+            //             moveWithinExchangeable(from: from, to: to)
+            //         }
+            //         .onDelete { offsets in
+            //             deleteByOffsets(offsets, in: split.exchangeableIndices)
+            //         }
+            //     }
+            // }
+            // .listStyle(.plain)
+            // .frame(minHeight: 120)
+            // .frame(maxWidth: .infinity)
+            VStack(alignment: .leading, spacing: 10) {
+                sectionHeader("Standaard")
+
+                VStack(alignment: .leading, spacing: 0) {
+                    if split.elementaryIndices.isEmpty {
+                        Text("—")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                    } else {
+                        ForEach(split.elementaryIndices, id: \.self) { i in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                // Reorder controls (within elementary only)
+                                VStack(spacing: 4) {
+                                    Button { moveElementaryUp(i) } label: {
+                                        Image(systemName: "chevron.up")
+                                            .imageScale(.small)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(!canMoveElementaryUp(i))
+                                    .help("Omhoog")
+
+                                    Button { moveElementaryDown(i) } label: {
+                                        Image(systemName: "chevron.down")
+                                            .imageScale(.small)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(!canMoveElementaryDown(i))
+                                    .help("Omlaag")
+                                }
+                                .frame(width: 18)
+
+                                ModuleEntrySummaryRow(
+                                    entry: $module.entries[i],
+                                    onEdit: { editTargetID = module.entries[i].id },
+                                    onDelete: { deleteEntryByIndex(i) }
+                                )
                             }
-                        )
-                        .onChange(of: module.entries[i].placement) { _, _ in
-                            normalizeEntriesOrderIfNeeded(animated: true)
+                            .onChange(of: module.entries[i].placement) { _, _  in
+                                normalizeEntriesOrderIfNeeded(animated: true)
+                            }
+
+                            Divider()
                         }
                     }
-                    .onMove { from, to in
-                        moveWithinExchangeable(from: from, to: to)
-                    }
-                    .onDelete { offsets in
-                        deleteByOffsets(offsets, in: split.exchangeableIndices)
+                }
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                sectionHeader("Inwisselbaar")
+
+                VStack(alignment: .leading, spacing: 0) {
+                    if split.exchangeableIndices.isEmpty {
+                        Text("—")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                    } else {
+                        ForEach(split.exchangeableIndices, id: \.self) { i in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                // Reorder controls (within exchangeable only)
+                                VStack(spacing: 4) {
+                                    Button { moveExchangeableUp(i) } label: {
+                                        Image(systemName: "chevron.up")
+                                            .imageScale(.small)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(!canMoveExchangeableUp(i))
+                                    .help("Omhoog")
+
+                                    Button { moveExchangeableDown(i) } label: {
+                                        Image(systemName: "chevron.down")
+                                            .imageScale(.small)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(!canMoveExchangeableDown(i))
+                                    .help("Omlaag")
+                                }
+                                .frame(width: 18)
+
+                                ModuleEntrySummaryRow(
+                                    entry: $module.entries[i],
+                                    onEdit: { editTargetID = module.entries[i].id },
+                                    onDelete: { deleteEntryByIndex(i) }
+                                )
+                            }
+                            .onChange(of: module.entries[i].placement) { _, _ in
+                                normalizeEntriesOrderIfNeeded(animated: true)
+                            }
+
+                            Divider()
+                        }
                     }
                 }
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
-            .listStyle(.plain)
-            .frame(minHeight: 120)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(12)
         .background(.regularMaterial)
@@ -5427,6 +5450,94 @@ public struct ModuleBoxView: View {
         withAnimation {
             module.entries.move(fromOffsets: actualFrom, toOffset: actualTo)
         }
+    }
+
+    // MOD: helpers for the non-List view:
+    private func canMoveElementaryUp(_ i: Int) -> Bool {
+        let indices = splitEntries(module.entries).elementaryIndices
+        guard let pos = indices.firstIndex(of: i) else { return false }
+        return pos > 0
+    }
+
+    private func canMoveElementaryDown(_ i: Int) -> Bool {
+        let indices = splitEntries(module.entries).elementaryIndices
+        guard let pos = indices.firstIndex(of: i) else { return false }
+        return pos + 1 < indices.count
+    }
+
+    private func canMoveExchangeableUp(_ i: Int) -> Bool {
+        let indices = splitEntries(module.entries).exchangeableIndices
+        guard let pos = indices.firstIndex(of: i) else { return false }
+        return pos > 0
+    }
+
+    private func canMoveExchangeableDown(_ i: Int) -> Bool {
+        let indices = splitEntries(module.entries).exchangeableIndices
+        guard let pos = indices.firstIndex(of: i) else { return false }
+        return pos + 1 < indices.count
+    }
+
+    private func moveElementaryUp(_ i: Int) {
+        normalizeEntriesOrderIfNeeded(animated: false)
+
+        let indices = splitEntries(module.entries).elementaryIndices
+        guard let pos = indices.firstIndex(of: i), pos > 0 else { return }
+
+        let a = indices[pos]
+        let b = indices[pos - 1]
+
+        withAnimation {
+            module.entries.swapAt(a, b)
+        }
+    }
+
+    private func moveElementaryDown(_ i: Int) {
+        normalizeEntriesOrderIfNeeded(animated: false)
+
+        let indices = splitEntries(module.entries).elementaryIndices
+        guard let pos = indices.firstIndex(of: i), pos + 1 < indices.count else { return }
+
+        let a = indices[pos]
+        let b = indices[pos + 1]
+
+        withAnimation {
+            module.entries.swapAt(a, b)
+        }
+    }
+
+    private func moveExchangeableUp(_ i: Int) {
+        normalizeEntriesOrderIfNeeded(animated: false)
+
+        let indices = splitEntries(module.entries).exchangeableIndices
+        guard let pos = indices.firstIndex(of: i), pos > 0 else { return }
+
+        let a = indices[pos]
+        let b = indices[pos - 1]
+
+        withAnimation {
+            module.entries.swapAt(a, b)
+        }
+    }
+
+    private func moveExchangeableDown(_ i: Int) {
+        normalizeEntriesOrderIfNeeded(animated: false)
+
+        let indices = splitEntries(module.entries).exchangeableIndices
+        guard let pos = indices.firstIndex(of: i), pos + 1 < indices.count else { return }
+
+        let a = indices[pos]
+        let b = indices[pos + 1]
+
+        withAnimation {
+            module.entries.swapAt(a, b)
+        }
+    }
+
+    @ViewBuilder
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
     }
 }
 
