@@ -1426,11 +1426,15 @@ public struct ModuleBoxView: View {
                                 normalizeEntriesOrderIfNeeded(animated: true)
                             }
                             // Divider()
-                            Divider()
-                                .padding(.leading, 10)
+
+                            if i != split.elementaryIndices.last {
+                                Divider()
+                                .padding(.leading, 36)
+                            }
                         }
                     }
                 }
+                .padding(.vertical, 2)
                 .background(.ultraThinMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
@@ -1477,11 +1481,14 @@ public struct ModuleBoxView: View {
                             }
 
                             // Divider()
-                            Divider()
-                                .padding(.leading, 10)
+                            if i != split.exchangeableIndices.last {
+                                Divider()
+                                .padding(.leading, 36)
+                            }
                         }
                     }
                 }
+                .padding(.vertical, 2)
                 .background(.ultraThinMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             }
