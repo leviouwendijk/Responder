@@ -1425,8 +1425,9 @@ public struct ModuleBoxView: View {
                             .onChange(of: module.entries[i].placement) { _, _  in
                                 normalizeEntriesOrderIfNeeded(animated: true)
                             }
-
+                            // Divider()
                             Divider()
+                                .padding(.leading, 10)
                         }
                     }
                 }
@@ -1475,7 +1476,9 @@ public struct ModuleBoxView: View {
                                 normalizeEntriesOrderIfNeeded(animated: true)
                             }
 
+                            // Divider()
                             Divider()
+                                .padding(.leading, 10)
                         }
                     }
                 }
